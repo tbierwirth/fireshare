@@ -10,6 +10,7 @@ import NotFound from './views/NotFound'
 import Settings from './views/Settings'
 import UserSettings from './views/UserSettings'
 import Feed from './views/Feed'
+import Games from './views/Games'
 import darkTheme from './common/darkTheme'
 import { ConfigService } from './services'
 import { getSetting, setSetting } from './common/utils'
@@ -71,6 +72,16 @@ export default function App() {
               <Navbar20 page="/register">
                 <Register />
               </Navbar20>
+            }
+          />
+          <Route
+            path="/games"
+            element={
+              <AuthWrapper>
+                <Navbar20 page="/games" collapsed={!drawerOpen}>
+                  <Games />
+                </Navbar20>
+              </AuthWrapper>
             }
           />
           <Route

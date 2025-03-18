@@ -168,11 +168,14 @@ def scan_video(ctx, path, game, tags, owner_id):
                 
                 # Add optional tags if provided
                 if tags:
-                    tag_list = [t.strip() for t in tags.split(',')]
-                    logger.info(f"Adding tags to video {video_id}: {tag_list}")
-                    for tag_name in tag_list:
-                        if tag_name:
-                            video.add_tag(tag_name)
+                    # Refresh the video object from the database to ensure it's attached to a session
+                    video_obj = Video.query.filter_by(video_id=video_id).first()
+                    if video_obj:
+                        tag_list = [t.strip() for t in tags.split(',')]
+                        logger.info(f"Adding tags to video {video_id}: {tag_list}")
+                        for tag_name in tag_list:
+                            if tag_name:
+                                video_obj.add_tag(tag_name)
                 
                 if owner_id:
                     user = User.query.get(owner_id)
@@ -222,11 +225,14 @@ def scan_video(ctx, path, game, tags, owner_id):
                     v.set_game(game)
                 
                 if tags:
-                    tag_list = [t.strip() for t in tags.split(',')]
-                    logger.info(f"Adding tags to new video {video_id}: {tag_list}")
-                    for tag_name in tag_list:
-                        if tag_name:
-                            v.add_tag(tag_name)
+                    # Refresh the video object from the database to ensure it's attached to a session
+                    video_obj = Video.query.filter_by(video_id=video_id).first()
+                    if video_obj:
+                        tag_list = [t.strip() for t in tags.split(',')]
+                        logger.info(f"Adding tags to new video {video_id}: {tag_list}")
+                        for tag_name in tag_list:
+                            if tag_name:
+                                video_obj.add_tag(tag_name)
                 
                 db.session.commit()
 
@@ -234,16 +240,30 @@ def scan_video(ctx, path, game, tags, owner_id):
                 logger.info(f"Checking for videos with missing posters...")
                 derived_path = Path(processed_root, "derived", info.video_id)
                 video_path = Path(processed_root, "video_links", info.video_id + video_file.suffix)
+                
+                # Create boomerang preview for the video
                 if video_path.exists():
+                    # Ensure derived directory exists
+                    if not derived_path.exists():
+                        derived_path.mkdir(parents=True, exist_ok=True)
+                        logger.info(f"Created derived directory at {str(derived_path)}")
+                    
+                    # Create poster
                     poster_path = Path(derived_path, "poster.jpg")
                     should_create_poster = not poster_path.exists()
                     if should_create_poster:
-                        if not derived_path.exists():
-                            derived_path.mkdir(parents=True)
-                        poster_time = int(info.duration * thumbnail_skip)
+                        poster_time = int(info.duration * thumbnail_skip) if info.duration else 0
+                        logger.info(f"Creating poster at position {poster_time}s for video {info.video_id}")
                         util.create_poster(video_path, derived_path / "poster.jpg", poster_time)
                     else:
                         logger.debug(f"Skipping creation of poster for video {info.video_id} because it exists at {str(poster_path)}")
+                    
+                    # Create boomerang preview
+                    boomerang_path = Path(derived_path, "boomerang-preview.webm")
+                    if not boomerang_path.exists():
+                        logger.info(f"Creating boomerang preview for video {info.video_id}")
+                        util.create_boomerang_preview(video_path, boomerang_path)
+                    
                     db.session.commit()
                 else:
                     logger.warn(f"Skipping creation of poster for video {info.video_id} because the video at {str(video_path)} does not exist or is not accessible")

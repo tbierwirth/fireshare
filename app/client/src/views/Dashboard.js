@@ -49,6 +49,9 @@ const Dashboard = ({ authenticated, searchText, cardSize, listStyle }) => {
         setVideos(res.data.videos)
         setFilteredVideos(res.data.videos)
         const tfolders = []
+        const gameSet = new Set(); // Use a Set to track unique games
+        
+        // Add traditional folders
         res.data.videos.forEach((v) => {
           const split = v.path
             .split('/')
@@ -57,8 +60,26 @@ const Dashboard = ({ authenticated, searchText, cardSize, listStyle }) => {
           if (split.length > 0 && !tfolders.includes(split[0])) {
             tfolders.push(split[0])
           }
+          
+          // Add games as "folders" too
+          if (v.game && !gameSet.has(v.game)) {
+            gameSet.add(v.game)
+          }
         })
+        
+        // Sort folders alphabetically and add All Videos at the top
         tfolders.sort((a, b) => (a.toLowerCase() > b.toLowerCase() ? 1 : -1)).unshift('All Videos')
+        
+        // Add Games section to folders (indented with emoji to distinguish)
+        if (gameSet.size > 0) {
+          tfolders.push('--- Games ---')
+          const gameArray = Array.from(gameSet);
+          gameArray.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+          gameArray.forEach(game => {
+            tfolders.push(`🎮 ${game}`);
+          });
+        }
+        
         setFolders(tfolders)
         setLoading(false)
       })
@@ -79,6 +100,11 @@ const Dashboard = ({ authenticated, searchText, cardSize, listStyle }) => {
   }, [selectedSort])
 
   const handleFolderSelection = (folder) => {
+    // Skip if separator is clicked
+    if (folder.value === '--- Games ---') {
+      return;
+    }
+    
     setSetting('folder', folder)
     setSelectedFolder(folder)
   }
@@ -128,13 +154,15 @@ const Dashboard = ({ authenticated, searchText, cardSize, listStyle }) => {
                   videos={
                     selectedFolder.value === 'All Videos'
                       ? filteredVideos
-                      : filteredVideos?.filter(
-                          (v) =>
-                            v.path
-                              .split('/')
-                              .slice(0, -1)
-                              .filter((f) => f !== '')[0] === selectedFolder.value,
-                        )
+                      : selectedFolder.value.startsWith('🎮 ')
+                        ? filteredVideos?.filter((v) => v.game === selectedFolder.value.substring(3))
+                        : filteredVideos?.filter((v) => {
+                            // Default to path-based filtering
+                            return v.path
+                                .split('/')
+                                .slice(0, -1)
+                                .filter((f) => f !== '')[0] === selectedFolder.value;
+                          })
                   }
                 />
               )}
@@ -148,13 +176,15 @@ const Dashboard = ({ authenticated, searchText, cardSize, listStyle }) => {
                   videos={
                     selectedFolder.value === 'All Videos'
                       ? filteredVideos
-                      : filteredVideos?.filter(
-                          (v) =>
-                            v.path
-                              .split('/')
-                              .slice(0, -1)
-                              .filter((f) => f !== '')[0] === selectedFolder.value,
-                        )
+                      : selectedFolder.value.startsWith('🎮 ')
+                        ? filteredVideos?.filter((v) => v.game === selectedFolder.value.substring(3))
+                        : filteredVideos?.filter((v) => {
+                            // Default to path-based filtering
+                            return v.path
+                                .split('/')
+                                .slice(0, -1)
+                                .filter((f) => f !== '')[0] === selectedFolder.value;
+                          })
                   }
                 />
               )}

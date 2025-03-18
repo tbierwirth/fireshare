@@ -15,6 +15,7 @@ import VideoLibraryIcon from '@mui/icons-material/VideoLibrary'
 import PublicIcon from '@mui/icons-material/Public'
 import SettingsIcon from '@mui/icons-material/Settings'
 import PeopleIcon from '@mui/icons-material/People'
+import SportsEsportsIcon from '@mui/icons-material/SportsEsports'
 import LogoutIcon from '@mui/icons-material/Logout'
 import LoginIcon from '@mui/icons-material/Login'
 import GitHubIcon from '@mui/icons-material/GitHub'
@@ -47,6 +48,7 @@ const CARD_SIZE_MULTIPLIER = 2
 const pages = [
   { title: 'My Videos', icon: <VideoLibraryIcon />, href: '/', private: true },
   { title: 'Public Videos', icon: <PublicIcon />, href: '/feed', private: false },
+  { title: 'Games', icon: <SportsEsportsIcon />, href: '/games', private: false },
   { title: 'Settings', icon: <SettingsIcon />, href: '/settings', private: true },
   { title: 'User Management', icon: <PeopleIcon />, href: '/users', private: true, adminOnly: true },
 ]
