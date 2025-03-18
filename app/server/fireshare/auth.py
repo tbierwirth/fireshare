@@ -6,6 +6,7 @@ import datetime
 import uuid
 import secrets
 import string
+from sqlalchemy import select
 from .models import User, InviteCode, UserRole, UserStatus
 from . import db
 import ldap
@@ -67,7 +68,10 @@ def login():
     authenticated = False
     username = request.json['username']
     password = request.json['password']
-    user = User.query.filter_by(username=username, ldap=False).first()
+    
+    # SQLAlchemy 2.0 query pattern
+    stmt = select(User).filter_by(username=username, ldap=False)
+    user = db.session.execute(stmt).scalar_one_or_none()
 
     if user and user.status != UserStatus.ACTIVE.value:
         return Response(response="Account is not active", status=401)
@@ -87,7 +91,10 @@ def login():
     if current_app.config["LDAP_ENABLE"]:
         authorised, admin = auth_user_ldap(username, password)
         if authorised:
-            userobj = User.query.filter_by(username=username, ldap=True).first()
+            # SQLAlchemy 2.0 query pattern
+            stmt = select(User).filter_by(username=username, ldap=True)
+            userobj = db.session.execute(stmt).scalar_one_or_none()
+            
             if not userobj:
                 userobj = User(
                     username=username, 
@@ -99,10 +106,13 @@ def login():
                 db.session.add(userobj)
                 db.session.commit()
             if userobj.admin != admin:
-                row = db.session.query(User).filter_by(id=userobj.id).first()
-                row.admin = admin
-                row.role = UserRole.ADMIN.value if admin else UserRole.USER.value
-                db.session.commit()
+                # SQLAlchemy 2.0 query pattern 
+                stmt = select(User).filter_by(id=userobj.id)
+                row = db.session.execute(stmt).scalar_one_or_none()
+                if row:
+                    row.admin = admin
+                    row.role = UserRole.ADMIN.value if admin else UserRole.USER.value
+                    db.session.commit()
                 
             # Update last login time
             userobj.last_login = datetime.datetime.utcnow()
@@ -133,12 +143,16 @@ def signup():
         return Response(response="Username and password are required", status=400)
 
     # Check if username or email already exists
-    existing_user = User.query.filter_by(username=username).first()
+    # SQLAlchemy 2.0 query pattern
+    stmt = select(User).filter_by(username=username)
+    existing_user = db.session.execute(stmt).scalar_one_or_none()
     if existing_user:
         return Response(response="Username already exists", status=400)
     
     if email:
-        existing_email = User.query.filter_by(email=email).first()
+        # SQLAlchemy 2.0 query pattern
+        stmt = select(User).filter_by(email=email)
+        existing_email = db.session.execute(stmt).scalar_one_or_none()
         if existing_email:
             return Response(response="Email already exists", status=400)
     
@@ -169,7 +183,9 @@ def register():
         return Response(response="Username, password, and invite code are required", status=400)
     
     # Check if invite code is valid
-    invite = InviteCode.query.filter_by(code=invite_code).first()
+    # SQLAlchemy 2.0 query pattern
+    stmt = select(InviteCode).filter_by(code=invite_code)
+    invite = db.session.execute(stmt).scalar_one_or_none()
     if not invite:
         return Response(response="Invalid invite code", status=400)
     
@@ -184,12 +200,16 @@ def register():
         return Response(response="Invite code is not valid for this email", status=400)
     
     # Check if username or email already exists
-    existing_user = User.query.filter_by(username=username).first()
+    # SQLAlchemy 2.0 query pattern
+    stmt = select(User).filter_by(username=username)
+    existing_user = db.session.execute(stmt).scalar_one_or_none()
     if existing_user:
         return Response(response="Username already exists", status=400)
     
     if email:
-        existing_email = User.query.filter_by(email=email).first()
+        # SQLAlchemy 2.0 query pattern
+        stmt = select(User).filter_by(email=email)
+        existing_email = db.session.execute(stmt).scalar_one_or_none()
         if existing_email:
             return Response(response="Email already exists", status=400)
             
@@ -255,9 +275,11 @@ def list_invites():
     if not current_user.is_admin():
         return Response(response="Administrator privileges required", status=403)
     
-    invites = InviteCode.query.order_by(InviteCode.created_at.desc()).all()
+    # SQLAlchemy 2.0 query pattern
+    stmt = select(InviteCode).order_by(InviteCode.created_at.desc())
+    result = db.session.execute(stmt).scalars().all()
     return jsonify({
-        "invites": [invite.json() for invite in invites]
+        "invites": [invite.json() for invite in result]
     })
 
 @auth.route('/api/invites/<int:invite_id>', methods=['DELETE'])
@@ -267,7 +289,9 @@ def delete_invite(invite_id):
     if not current_user.is_admin():
         return Response(response="Administrator privileges required", status=403)
     
-    invite = InviteCode.query.get(invite_id)
+    # SQLAlchemy 2.0 query pattern
+    stmt = select(InviteCode).filter_by(id=invite_id)
+    invite = db.session.execute(stmt).scalar_one_or_none()
     if not invite:
         return Response(response="Invite code not found", status=404)
     
@@ -303,7 +327,9 @@ def update_profile():
     
     # Check if email already exists (if being changed)
     if email and email != current_user.email:
-        existing_email = User.query.filter_by(email=email).first()
+        # SQLAlchemy 2.0 query pattern
+        stmt = select(User).filter_by(email=email)
+        existing_email = db.session.execute(stmt).scalar_one_or_none()
         if existing_email:
             return Response(response="Email already exists", status=400)
     
@@ -351,7 +377,9 @@ def list_users():
     if not current_user.is_admin():
         return Response(response="Administrator privileges required", status=403)
     
-    users = User.query.all()
+    # SQLAlchemy 2.0 query pattern
+    stmt = select(User)
+    users = db.session.execute(stmt).scalars().all()
     return jsonify({
         "users": [user.json() for user in users]
     })
@@ -363,7 +391,9 @@ def update_user(user_id):
     if not current_user.is_admin():
         return Response(response="Administrator privileges required", status=403)
     
-    user = User.query.get(user_id)
+    # SQLAlchemy 2.0 query pattern
+    stmt = select(User).filter_by(id=user_id)
+    user = db.session.execute(stmt).scalar_one_or_none()
     if not user:
         return Response(response="User not found", status=404)
     
@@ -378,7 +408,9 @@ def update_user(user_id):
     if 'email' in request.json:
         # Check if email already exists
         if request.json['email'] and request.json['email'] != user.email:
-            existing_email = User.query.filter_by(email=request.json['email']).first()
+            # SQLAlchemy 2.0 query pattern
+            stmt = select(User).filter_by(email=request.json['email'])
+            existing_email = db.session.execute(stmt).scalar_one_or_none()
             if existing_email:
                 return Response(response="Email already exists", status=400)
         user.email = request.json['email']
@@ -407,7 +439,9 @@ def delete_user(user_id):
     if user_id == current_user.id:
         return Response(response="Cannot delete your own account", status=400)
     
-    user = User.query.get(user_id)
+    # SQLAlchemy 2.0 query pattern
+    stmt = select(User).filter_by(id=user_id)
+    user = db.session.execute(stmt).scalar_one_or_none()
     if not user:
         return Response(response="User not found", status=404)
     
