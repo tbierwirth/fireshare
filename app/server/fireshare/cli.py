@@ -116,9 +116,10 @@ def scan_videos(root):
 @cli.command()
 @click.pass_context
 @click.option("--path", "-p", help="path to video to scan", required=False)
+@click.option("--game", "-g", help="game name for the video (required for organization)", required=False)
 @click.option("--tags", "-t", help="comma-separated list of tags to apply to the video", required=False)
 @click.option("--owner-id", "-o", help="user ID of the video owner", type=int, required=False)
-def scan_video(ctx, path, tags, owner_id):
+def scan_video(ctx, path, game, tags, owner_id):
     with create_app().app_context():
         paths = current_app.config['PATHS']
         videos_path = paths["video"]
@@ -157,8 +158,15 @@ def scan_video(ctx, path, tags, owner_id):
                     logger.info(f"Updating Video {video_id}, updated_at={updated_at}")
                     db.session.query(Video).filter_by(video_id=existing.video_id).update({ "updated_at": updated_at })
                 
-                # Update tags and owner if provided
+                # Update game, tags, and owner if provided
                 video = existing
+                
+                # Set game if provided (required)
+                if game:
+                    logger.info(f"Setting game for video {video_id}: {game}")
+                    video.set_game(game)
+                
+                # Add optional tags if provided
                 if tags:
                     tag_list = [t.strip() for t in tags.split(',')]
                     logger.info(f"Adding tags to video {video_id}: {tag_list}")
@@ -208,14 +216,19 @@ def scan_video(ctx, path, tags, owner_id):
                 ctx.invoke(sync_metadata, video=video_id)
                 info = VideoInfo.query.filter(VideoInfo.video_id==video_id).one()
 
-                # Apply tags after video is fully created
+                # Set game and apply tags after video is fully created
+                if game:
+                    logger.info(f"Setting game for new video {video_id}: {game}")
+                    v.set_game(game)
+                
                 if tags:
                     tag_list = [t.strip() for t in tags.split(',')]
                     logger.info(f"Adding tags to new video {video_id}: {tag_list}")
                     for tag_name in tag_list:
                         if tag_name:
                             v.add_tag(tag_name)
-                    db.session.commit()
+                
+                db.session.commit()
 
                 processed_root = Path(current_app.config['PROCESSED_DIRECTORY'])
                 logger.info(f"Checking for videos with missing posters...")

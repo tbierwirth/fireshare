@@ -87,6 +87,22 @@ const service = {
     return Api().get('/api/manual/scan')
   },
   
+  // Game operations
+  getGames() {
+    return Api().get('/api/games')
+  },
+  searchGames(query) {
+    return Api().get('/api/games/search', {
+      params: { q: query }
+    })
+  },
+  getVideoGame(videoId) {
+    return Api().get(`/api/video/${videoId}/game`)
+  },
+  setVideoGame(videoId, game) {
+    return Api().put(`/api/video/${videoId}/game`, { game })
+  },
+  
   // Tag operations
   getTags() {
     return Api().get('/api/tags')

@@ -13,7 +13,7 @@ from pathlib import Path
 
 
 from . import db
-from .models import Video, VideoInfo, VideoView, Tag, Folder
+from .models import Video, VideoInfo, VideoView, Tag, Folder, Game
 from .constants import SUPPORTED_FILE_TYPES
 
 templates_path = os.environ.get('TEMPLATE_PATH') or 'templates'
@@ -260,7 +260,13 @@ def public_upload_video():
     if not filetype in SUPPORTED_FILE_TYPES:
         return jsonify({"error": f"Unsupported file type: {filetype}"}), 400
         
+    # Get the game (required) and tags (optional)
+    game = request.form.get('game')
     tags = request.form.getlist('tags[]') if 'tags[]' in request.form else []
+    
+    # Require a game to be specified
+    if not game:
+        return jsonify({"error": "Game is required"}), 400
     
     upload_directory = paths['video'] / upload_folder
     if not os.path.exists(upload_directory):
@@ -277,7 +283,10 @@ def public_upload_video():
     # Scan the video
     cmd = f"fireshare scan-video --path=\"{save_path}\""
     
-    # Add tags if provided - we'll need to modify the CLI to support this
+    # Add game
+    cmd += f" --game=\"{game}\""
+    
+    # Add tags if provided
     if tags:
         tag_list = ','.join(tags)
         cmd += f" --tags=\"{tag_list}\""
@@ -314,7 +323,13 @@ def upload_video():
     if not filetype in SUPPORTED_FILE_TYPES:
         return jsonify({"error": f"Unsupported file type: {filetype}"}), 400
         
+    # Get the game (required) and tags (optional)
+    game = request.form.get('game')
     tags = request.form.getlist('tags[]') if 'tags[]' in request.form else []
+    
+    # Require a game to be specified
+    if not game:
+        return jsonify({"error": "Game is required"}), 400
     
     upload_directory = paths['video'] / upload_folder
     if not os.path.exists(upload_directory):
@@ -331,7 +346,10 @@ def upload_video():
     # Scan the video
     cmd = f"fireshare scan-video --path=\"{save_path}\""
     
-    # Add tags if provided - we'll need to modify the CLI to support this
+    # Add game
+    cmd += f" --game=\"{game}\""
+    
+    # Add tags if provided
     if tags:
         tag_list = ','.join(tags)
         cmd += f" --tags=\"{tag_list}\""
@@ -378,6 +396,46 @@ def get_video():
     rv = Response(chunk, 206, mimetype='video/mp4', content_type='video/mp4', direct_passthrough=True)
     rv.headers.add('Content-Range', 'bytes {0}-{1}/{2}'.format(start, start + length - 1, file_size))
     return rv
+
+# Game API endpoints
+@api.route('/api/games', methods=['GET'])
+def get_games():
+    """Get all games"""
+    games = Game.query.order_by(Game.name).all()
+    return jsonify({"games": [game.json() for game in games]})
+
+@api.route('/api/games/search', methods=['GET'])
+def search_games():
+    """Search for games by name (case-insensitive partial match)"""
+    query = request.args.get('q', '')
+    if not query:
+        return jsonify({"games": []})
+    
+    # Convert query to lowercase for case-insensitive matching
+    query = f"%{query.lower()}%"
+    games = Game.query.filter(Game.slug.like(Game.generate_slug(query))).all()
+    return jsonify({"games": [game.json() for game in games]})
+
+@api.route('/api/video/<video_id>/game', methods=['GET', 'PUT'])
+def handle_video_game(video_id):
+    """Get or set a video's game"""
+    video = Video.query.filter_by(video_id=video_id).first()
+    if not video:
+        return jsonify({"error": "Video not found"}), 404
+        
+    if request.method == 'GET':
+        return jsonify({"game": video.game.name if video.game else None})
+        
+    if request.method == 'PUT':
+        if not current_user.is_authenticated:
+            return jsonify({"error": "Authentication required"}), 401
+            
+        game_name = request.json.get('game')
+        if not game_name:
+            return jsonify({"error": "No game provided"}), 400
+            
+        game = video.set_game(game_name)
+        return jsonify({"game": game.name}), 200
 
 # Tag and Folder API endpoints
 @api.route('/api/tags', methods=['GET'])

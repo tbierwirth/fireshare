@@ -1,10 +1,10 @@
 import React from 'react'
-import { Box, Grid, Paper, Stack, Typography, Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@mui/material'
+import { Box, Grid, Paper, Stack, Typography, Dialog, DialogTitle, DialogContent, DialogActions, Button, Divider } from '@mui/material'
 import CloudUploadIcon from '@mui/icons-material/CloudUpload'
 import styled from '@emotion/styled'
 import { VideoService } from '../../services'
 import { getSetting } from '../../common/utils'
-import { TagInput } from '../tags'
+import { TagInput, GameSelector } from '../tags'
 
 const Input = styled('input')({
   display: 'none',
@@ -19,6 +19,7 @@ const UploadCard = ({ authenticated, feedView = false, publicUpload = false, fet
   const [progress, setProgress] = React.useState(0)
   const [uploadRate, setUploadRate] = React.useState()
   const [showTagDialog, setShowTagDialog] = React.useState(false)
+  const [selectedGame, setSelectedGame] = React.useState('')
   const [selectedTags, setSelectedTags] = React.useState([])
 
   const uiConfig = getSetting('ui_config')
@@ -74,6 +75,9 @@ const UploadCard = ({ authenticated, feedView = false, publicUpload = false, fet
       const formData = new FormData()
       formData.append('file', selectedFile)
       
+      // Add game to form data
+      formData.append('game', selectedGame)
+      
       // Add tags to form data
       if (selectedTags && selectedTags.length > 0) {
         selectedTags.forEach(tag => {
@@ -105,6 +109,7 @@ const UploadCard = ({ authenticated, feedView = false, publicUpload = false, fet
       setProgress(0)
       setUploadRate(null)
       setIsSelected(false)
+      setSelectedGame('')
       setSelectedTags([])
     }
     if (isSelected && selectedFile) upload()
@@ -184,19 +189,38 @@ const UploadCard = ({ authenticated, feedView = false, publicUpload = false, fet
         </Paper>
       </label>
       
-      {/* Tag Selection Dialog */}
+      {/* Game and Tag Selection Dialog */}
       <Dialog open={showTagDialog} onClose={() => handleDialogClose(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Add Tags to Your Video</DialogTitle>
+        <DialogTitle>Categorize Your Video</DialogTitle>
         <DialogContent>
-          <Typography variant="body2" sx={{ mb: 2 }}>
-            Tags help organize your videos and make them easier to find. Please add game names or other relevant tags.
+          <Typography variant="body1" sx={{ mb: 2 }}>
+            Please select the game this video is from and add any additional tags.
           </Typography>
+          
+          {/* Game Selection (Required) */}
+          <GameSelector 
+            initialGame={selectedGame}
+            onChange={setSelectedGame}
+            sx={{ width: '100%', mb: 2 }}
+          />
+          
+          <Divider sx={{ my: 2 }} />
+          
+          {/* Additional Tags (Optional) */}
+          <Typography variant="subtitle2" gutterBottom>
+            Additional Tags (Optional)
+          </Typography>
+          
           <TagInput 
             onChange={setSelectedTags} 
-            label="Game/Video Tags" 
+            label="Tags" 
             sx={{ width: '100%', mt: 1 }} 
             initialTags={selectedTags}
           />
+          
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+            Add optional tags like "funny", "highlight", or "tutorial" to make your videos easier to find.
+          </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => handleDialogClose(false)}>Cancel</Button>
@@ -204,8 +228,9 @@ const UploadCard = ({ authenticated, feedView = false, publicUpload = false, fet
             onClick={() => handleDialogClose(true)} 
             variant="contained" 
             color="primary"
+            disabled={!selectedGame}
           >
-            Upload{selectedTags.length > 0 ? ` with ${selectedTags.length} tag${selectedTags.length !== 1 ? 's' : ''}` : ''}
+            Upload
           </Button>
         </DialogActions>
       </Dialog>

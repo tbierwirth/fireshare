@@ -7,7 +7,7 @@ import DeleteIcon from '@mui/icons-material/Delete'
 import { ButtonGroup, Stack, TextField, Typography, Divider } from '@mui/material'
 import { VideoService } from '../../services'
 import LightTooltip from '../misc/LightTooltip'
-import { TagInput } from '../tags'
+import { TagInput, GameSelector } from '../tags'
 
 //
 const style = {
@@ -27,14 +27,28 @@ const style = {
 const UpdateDetailsModal = ({ open, close, videoId, currentTitle, currentDescription, alertHandler }) => {
   const [title, setTitle] = React.useState(currentTitle)
   const [description, setDescription] = React.useState(currentDescription)
+  const [game, setGame] = React.useState('')
   const [tags, setTags] = React.useState([])
   const [confirmDelete, setConfirmDelete] = React.useState(false)
-  const [loading, setLoading] = React.useState(false)
+  const [, setLoading] = React.useState(false)
   
-  // Load video tags when modal opens
+  // Load video game and tags when modal opens
   React.useEffect(() => {
     if (open && videoId) {
       setLoading(true)
+      
+      // Load the game
+      VideoService.getVideoGame(videoId)
+        .then(response => {
+          if (response.data && response.data.game) {
+            setGame(response.data.game)
+          }
+        })
+        .catch(error => {
+          console.error('Error loading game:', error)
+        })
+      
+      // Load the tags
       VideoService.getVideoTags(videoId)
         .then(response => {
           if (response.data && response.data.tags) {
@@ -67,7 +81,12 @@ const UpdateDetailsModal = ({ open, close, videoId, currentTitle, currentDescrip
     try {
       await VideoService.updateDetails(videoId, update)
       
-      // Then update tags if changed
+      // Then update game
+      if (game) {
+        await VideoService.setVideoGame(videoId, game)
+      }
+      
+      // Then update tags if provided
       if (tags.length > 0) {
         await VideoService.addVideoTags(videoId, tags)
       }
@@ -75,7 +94,7 @@ const UpdateDetailsModal = ({ open, close, videoId, currentTitle, currentDescrip
       alertHandler({
         open: true,
         type: 'success',
-        message: 'Video details and tags updated!',
+        message: 'Video details, game, and tags updated!',
       })
     } catch (err) {
       alertHandler({
@@ -84,7 +103,7 @@ const UpdateDetailsModal = ({ open, close, videoId, currentTitle, currentDescrip
         message: `${err.response?.data?.error || 'An unknown error occurred attempting to update the video'}`,
       })
     }
-    handleClose({...update, tags})
+    handleClose({...update, game, tags})
   }
 
   const handleDelete = async () => {
@@ -145,22 +164,39 @@ const UpdateDetailsModal = ({ open, close, videoId, currentTitle, currentDescrip
           <Divider sx={{ my: 1 }} />
           
           <Typography variant="subtitle1" gutterBottom>
-            Video Tags
+            Game
+          </Typography>
+          
+          <GameSelector 
+            initialGame={game}
+            onChange={setGame}
+            sx={{ width: '100%', mb: 2 }}
+          />
+          
+          <Typography variant="caption" color="text.secondary">
+            The game this video is from. This will determine which folder the video appears in.
+          </Typography>
+          
+          <Divider sx={{ my: 1 }} />
+          
+          <Typography variant="subtitle1" gutterBottom>
+            Additional Tags
           </Typography>
           
           <TagInput 
             initialTags={tags} 
             onChange={setTags}
-            label="Game/Category Tags" 
+            label="Tags (Optional)" 
           />
           
           <Typography variant="caption" color="text.secondary">
-            Tags help organize your videos. Add game names or categories to make videos easier to find.
+            Add optional tags like "funny", "highlight", or "tutorial" to make your videos easier to find.
           </Typography>
           
           <Button 
             variant="contained" 
             onClick={handleSave}
+            disabled={!game}
             sx={{ mt: 2 }}
           >
             Save Changes

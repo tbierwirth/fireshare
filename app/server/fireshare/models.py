@@ -85,8 +85,8 @@ class InviteCode(db.Model):
             "status": self.status
         }
 
-class Tag(db.Model):
-    __tablename__ = "tag"
+class Game(db.Model):
+    __tablename__ = "game"
     
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)  # Original display name with proper casing
@@ -95,7 +95,50 @@ class Tag(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
     
     # Relationships
-    folder = db.relationship('Folder', backref='tag', uselist=False)
+    folder = db.relationship('Folder', backref='game', uselist=False)
+    videos = db.relationship('Video', backref=db.backref('game', lazy=True))
+    
+    def __repr__(self):
+        return f"<Game {self.name}>"
+    
+    @classmethod
+    def generate_slug(cls, name):
+        """Create a slug from the name"""
+        # Convert to lowercase and replace spaces with hyphens
+        return re.sub(r'[^a-z0-9-]', '', name.lower().replace(' ', '-'))
+    
+    @classmethod
+    def find_or_create(cls, name):
+        """Find a game by name (case insensitive) or create a new one"""
+        slug = cls.generate_slug(name)
+        game = cls.query.filter_by(slug=slug).first()
+        if not game:
+            game = cls(name=name, slug=slug)
+            db.session.add(game)
+            db.session.commit()
+            
+            # Create a folder for this game
+            Folder.for_game(game)
+            
+        return game
+    
+    def json(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "slug": self.slug,
+            "folder_id": self.folder.id if self.folder else None,
+            "video_count": len(self.videos) if self.videos else 0
+        }
+
+class Tag(db.Model):
+    __tablename__ = "tag"
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)  # Original display name with proper casing
+    slug = db.Column(db.String(100), nullable=False, unique=True, index=True)  # Lowercase, slugified version for matching
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
     
     def __repr__(self):
         return f"<Tag {self.name}>"
@@ -122,8 +165,7 @@ class Tag(db.Model):
             "id": self.id,
             "name": self.name,
             "slug": self.slug,
-            "folder_id": self.folder.id if self.folder else None,
-            "video_count": len(self.folder.videos) if self.folder else 0 if self.folder else 0
+            "video_count": len(self.videos) if hasattr(self, 'videos') else 0
         }
 
 class Folder(db.Model):
@@ -135,6 +177,8 @@ class Folder(db.Model):
     description = db.Column(db.Text, nullable=True)
     parent_id = db.Column(db.Integer, db.ForeignKey('folder.id'), nullable=True)
     tag_id = db.Column(db.Integer, db.ForeignKey('tag.id'), nullable=True, unique=True)
+    game_id = db.Column(db.Integer, db.ForeignKey('game.id'), nullable=True, unique=True)
+    folder_type = db.Column(db.String(20), default="tag")  # 'tag', 'game', or 'custom'
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
     
@@ -155,7 +199,24 @@ class Folder(db.Model):
                 name=tag.name,
                 slug=tag.slug,
                 description=f"Videos tagged with {tag.name}",
-                tag_id=tag.id
+                tag_id=tag.id,
+                folder_type="tag"
+            )
+            db.session.add(folder)
+            db.session.commit()
+        return folder
+    
+    @classmethod
+    def for_game(cls, game):
+        """Get or create a folder for a game"""
+        folder = cls.query.filter_by(game_id=game.id).first()
+        if not folder:
+            folder = cls(
+                name=game.name,
+                slug=game.slug,
+                description=f"Videos from {game.name}",
+                game_id=game.id,
+                folder_type="game"
             )
             db.session.add(folder)
             db.session.commit()
@@ -168,7 +229,9 @@ class Folder(db.Model):
             "slug": self.slug,
             "description": self.description,
             "parent_id": self.parent_id,
-            "tag": self.tag.name if self.tag else None,
+            "folder_type": self.folder_type,
+            "tag": self.tag.name if hasattr(self, 'tag') and self.tag else None,
+            "game": self.game.name if hasattr(self, 'game') and self.game else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "video_count": len(self.videos) if self.videos else 0
@@ -192,7 +255,10 @@ class Video(db.Model):
     created_at = db.Column(db.DateTime(), default=datetime.datetime.utcnow)
     updated_at = db.Column(db.DateTime(), default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
     
-    # New columns for folder and owner
+    # Required game for organization
+    game_id = db.Column(db.Integer, db.ForeignKey('game.id'), nullable=True)  # Nullable for backward compatibility
+    
+    # Folder and owner
     folder_id = db.Column(db.Integer, db.ForeignKey('folder.id'), nullable=True)
     owner_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     
@@ -201,17 +267,23 @@ class Video(db.Model):
     owner = db.relationship('User', backref=db.backref('videos', lazy='dynamic'))
     tags = db.relationship('Tag', secondary=video_tags, backref=db.backref('videos', lazy='dynamic'))
     
+    def set_game(self, game_name):
+        """Set the game for this video and create/assign to the corresponding folder"""
+        game = Game.find_or_create(game_name)
+        self.game_id = game.id
+        
+        # Assign to the game's folder
+        folder = Folder.for_game(game)
+        self.folder_id = folder.id
+            
+        db.session.commit()
+        return game
+    
     def add_tag(self, tag_name):
-        """Add a tag to the video and assign to the corresponding folder"""
+        """Add a tag to the video (pure categorization, doesn't affect folder)"""
         tag = Tag.find_or_create(tag_name)
         if tag not in self.tags:
             self.tags.append(tag)
-            
-        # Auto-assign to folder based on first tag if no folder is set
-        if not self.folder_id:
-            folder = Folder.for_tag(tag_name)
-            self.folder_id = folder.id
-            
         db.session.commit()
         return tag
     
@@ -224,6 +296,8 @@ class Video(db.Model):
             "info": self.info.json(),
             "folder_id": self.folder_id,
             "folder_name": self.folder.name if self.folder else None,
+            "game": self.game.name if self.game else None,
+            "game_id": self.game_id,
             "owner": self.owner.username if self.owner else None,
             "tags": [tag.name for tag in self.tags]
         }
