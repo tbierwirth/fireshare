@@ -133,6 +133,13 @@ const LoginForm = function ({ sx }) {
             >
               Sign in
             </Button>
+            <Button
+              variant="text"
+              size="small"
+              onClick={() => navigate('/register')}
+            >
+              Need an account? Register with invite code
+            </Button>
           </Stack>
         </Grid>
       </Grid>
