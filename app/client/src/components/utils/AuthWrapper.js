@@ -17,7 +17,7 @@ const AuthWrapper = ({ children, redirect }) => {
       setCheckingAuth(false)
     }
     isLoggedIn()
-  })
+  }, [])
 
   if (checkingAuth) return <div></div>
 
