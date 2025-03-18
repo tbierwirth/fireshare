@@ -21,9 +21,9 @@ zipp==3.15.0
 xxhash==3.3.0
 apscheduler==3.10.1
 python-ldap==3.4.3
+python-dotenv==1.0.0  # Kept for environment variable management in production
 
 # Removed unused packages:
 # email-validator - Not used in codebase
 # Flask-Limiter - Not used in codebase
 # pyjwt - Not used in codebase
-# python-dotenv - Not used in codebase
