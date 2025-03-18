@@ -105,7 +105,8 @@ class Game(db.Model):
     def generate_slug(cls, name):
         """Create a slug from the name"""
         # Convert to lowercase and replace spaces with hyphens
-        return re.sub(r'[^a-z0-9-]', '', name.lower().replace(' ', '-'))
+        # Allow alphanumeric, hyphens, periods and underscores in slugs
+        return re.sub(r'[^a-z0-9\-\._]', '', name.lower().replace(' ', '-'))
     
     @classmethod
     def find_or_create(cls, name):
@@ -147,7 +148,8 @@ class Tag(db.Model):
     def generate_slug(cls, name):
         """Create a slug from the name"""
         # Convert to lowercase and replace spaces with hyphens
-        return re.sub(r'[^a-z0-9-]', '', name.lower().replace(' ', '-'))
+        # Allow alphanumeric, hyphens, periods and underscores in slugs
+        return re.sub(r'[^a-z0-9\-\._]', '', name.lower().replace(' ', '-'))
     
     @classmethod
     def find_or_create(cls, name):
