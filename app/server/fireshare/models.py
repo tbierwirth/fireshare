@@ -1,13 +1,88 @@
 import json
+import datetime
+import enum
 from flask_login import UserMixin
 from . import db
+
+class UserRole(enum.Enum):
+    ADMIN = "admin"
+    USER = "user"
+    
+class UserStatus(enum.Enum):
+    ACTIVE = "active"
+    SUSPENDED = "suspended"
+    DELETED = "deleted"
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(100), unique=True)
-    password = db.Column(db.String(100))
-    admin = db.Column(db.Boolean, default=True)
+    email = db.Column(db.String(255), unique=True, nullable=True)
+    password = db.Column(db.String(255))
+    display_name = db.Column(db.String(100), nullable=True)
+    role = db.Column(db.String(20), default=UserRole.USER.value)
+    status = db.Column(db.String(20), default=UserStatus.ACTIVE.value)
+    admin = db.Column(db.Boolean, default=False)  # Keeping for backward compatibility
     ldap = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    last_login = db.Column(db.DateTime, nullable=True)
+    
+    def is_admin(self):
+        return self.role == UserRole.ADMIN.value or self.admin
+    
+    def is_active(self):
+        return self.status == UserStatus.ACTIVE.value
+    
+    def json(self):
+        return {
+            "id": self.id,
+            "username": self.username,
+            "email": self.email,
+            "display_name": self.display_name or self.username,
+            "role": self.role,
+            "status": self.status,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "last_login": self.last_login.isoformat() if self.last_login else None
+        }
+
+class InviteCode(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(50), unique=True, nullable=False)
+    email = db.Column(db.String(255), nullable=True)
+    created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    created_by = db.relationship('User', foreign_keys=[created_by_id])
+    used_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    used_by = db.relationship('User', foreign_keys=[used_by_id])
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    expires_at = db.Column(db.DateTime)
+    used_at = db.Column(db.DateTime, nullable=True)
+    
+    @property
+    def is_expired(self):
+        return self.expires_at and self.expires_at < datetime.datetime.utcnow()
+    
+    @property
+    def is_used(self):
+        return self.used_at is not None
+    
+    @property
+    def status(self):
+        if self.is_used:
+            return "used"
+        if self.is_expired:
+            return "expired"
+        return "valid"
+    
+    def json(self):
+        return {
+            "id": self.id,
+            "code": self.code,
+            "email": self.email,
+            "created_by": self.created_by.username if self.created_by else None,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "expires_at": self.expires_at.isoformat() if self.expires_at else None,
+            "status": self.status
+        }
 
 class Video(db.Model):
     __tablename__ = "video"

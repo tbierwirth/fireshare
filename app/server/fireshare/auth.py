@@ -2,7 +2,11 @@ from flask import Blueprint, redirect, request, Response, jsonify, current_app
 from flask_login import login_user, logout_user, current_user, login_required
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
-from .models import User
+import datetime
+import uuid
+import secrets
+import string
+from .models import User, InviteCode, UserRole, UserStatus
 from . import db
 import ldap
 import logging
@@ -52,6 +56,12 @@ def auth_user_ldap(username, password):
 auth = Blueprint('auth', __name__)
 CORS(auth, supports_credentials=True)
 
+def generate_invite_code():
+    """Generate a random invite code"""
+    alphabet = string.ascii_letters + string.digits
+    code = ''.join(secrets.choice(alphabet) for _ in range(16))
+    return code
+
 @auth.route('/api/login', methods=['POST'])
 def login():
     authenticated = False
@@ -59,50 +69,352 @@ def login():
     password = request.json['password']
     user = User.query.filter_by(username=username, ldap=False).first()
 
+    if user and user.status != UserStatus.ACTIVE.value:
+        return Response(response="Account is not active", status=401)
+
     if user and check_password_hash(user.password, password):
+        # Update last login time
+        user.last_login = datetime.datetime.utcnow()
+        db.session.commit()
+        
         login_user(user, remember=True)
-        return Response(status=200)
+        
+        return jsonify({
+            "user": user.json(),
+            "isAdmin": user.is_admin()
+        })
 
     if current_app.config["LDAP_ENABLE"]:
         authorised, admin = auth_user_ldap(username, password)
         if authorised:
             userobj = User.query.filter_by(username=username, ldap=True).first()
             if not userobj:
-                userobj = User(username=username, ldap=True, admin=admin)
+                userobj = User(
+                    username=username, 
+                    ldap=True, 
+                    admin=admin,
+                    role=UserRole.ADMIN.value if admin else UserRole.USER.value,
+                    status=UserStatus.ACTIVE.value
+                )
                 db.session.add(userobj)
                 db.session.commit()
             if userobj.admin != admin:
                 row = db.session.query(User).filter_by(id=userobj.id).first()
                 row.admin = admin
+                row.role = UserRole.ADMIN.value if admin else UserRole.USER.value
                 db.session.commit()
+                
+            # Update last login time
+            userobj.last_login = datetime.datetime.utcnow()
+            db.session.commit()
+            
             login_user(userobj, remember=True)
-            return Response(status=200)
+            
+            return jsonify({
+                "user": userobj.json(),
+                "isAdmin": userobj.is_admin()
+            })
     
     return Response(response="Invalid username or password", status=401)
 
 @auth.route('/api/signup', methods=['POST'])
 @login_required
 def signup():
-    username = request.json['username']
-    password = request.json['password']
+    """Admin creates a new user account directly"""
+    if not current_user.is_admin():
+        return Response(response="Administrator privileges required", status=403)
+        
+    username = request.json.get('username')
+    password = request.json.get('password')
+    email = request.json.get('email')
+    role = request.json.get('role', UserRole.USER.value)
+    
+    if not username or not password:
+        return Response(response="Username and password are required", status=400)
 
-    user = User.query.filter_by(username=username).first()
+    # Check if username or email already exists
+    existing_user = User.query.filter_by(username=username).first()
+    if existing_user:
+        return Response(response="Username already exists", status=400)
     
-    if user:
-        return Response(response="User already exists.", status=400)
+    if email:
+        existing_email = User.query.filter_by(email=email).first()
+        if existing_email:
+            return Response(response="Email already exists", status=400)
     
-    new_user = User(username=username, password=generate_password_hash(password, method='sha256'))
+    # Create new user
+    new_user = User(
+        username=username, 
+        password=generate_password_hash(password, method='sha256'),
+        email=email,
+        role=role,
+        admin=(role == UserRole.ADMIN.value),
+        status=UserStatus.ACTIVE.value
+    )
 
     db.session.add(new_user)
     db.session.commit()
 
+    return jsonify({"user": new_user.json()})
+    
+@auth.route('/api/register', methods=['POST'])
+def register():
+    """Public registration endpoint using invite code"""
+    username = request.json.get('username')
+    password = request.json.get('password')
+    email = request.json.get('email')
+    invite_code = request.json.get('invite_code')
+    
+    if not username or not password or not invite_code:
+        return Response(response="Username, password, and invite code are required", status=400)
+    
+    # Check if invite code is valid
+    invite = InviteCode.query.filter_by(code=invite_code).first()
+    if not invite:
+        return Response(response="Invalid invite code", status=400)
+    
+    if invite.is_used:
+        return Response(response="Invite code has already been used", status=400)
+        
+    if invite.is_expired:
+        return Response(response="Invite code has expired", status=400)
+    
+    # If invite was tied to a specific email, check it matches
+    if invite.email and invite.email != email:
+        return Response(response="Invite code is not valid for this email", status=400)
+    
+    # Check if username or email already exists
+    existing_user = User.query.filter_by(username=username).first()
+    if existing_user:
+        return Response(response="Username already exists", status=400)
+    
+    if email:
+        existing_email = User.query.filter_by(email=email).first()
+        if existing_email:
+            return Response(response="Email already exists", status=400)
+            
+    # Create new user with regular user role
+    new_user = User(
+        username=username, 
+        password=generate_password_hash(password, method='sha256'),
+        email=email,
+        role=UserRole.USER.value,
+        admin=False,
+        status=UserStatus.ACTIVE.value
+    )
+    
+    db.session.add(new_user)
+    
+    # Mark invite code as used
+    invite.used_by_id = new_user.id
+    invite.used_at = datetime.datetime.utcnow()
+    
+    db.session.commit()
+    
+    # Log in the new user
+    login_user(new_user, remember=True)
+    
+    return jsonify({
+        "user": new_user.json(),
+        "isAdmin": new_user.is_admin()
+    })
+
+@auth.route('/api/invite', methods=['POST'])
+@login_required
+def create_invite():
+    """Create a new invite code (admin only)"""
+    if not current_user.is_admin():
+        return Response(response="Administrator privileges required", status=403)
+    
+    email = request.json.get('email')
+    expires_days = request.json.get('expires_days', 7)  # Default expiration: 7 days
+    
+    # Generate a unique invite code
+    code = generate_invite_code()
+    
+    # Calculate expiration date
+    expires_at = datetime.datetime.utcnow() + datetime.timedelta(days=expires_days)
+    
+    # Create invite code
+    invite = InviteCode(
+        code=code,
+        email=email,
+        created_by_id=current_user.id,
+        expires_at=expires_at
+    )
+    
+    db.session.add(invite)
+    db.session.commit()
+    
+    return jsonify({"invite": invite.json()})
+
+@auth.route('/api/invites', methods=['GET'])
+@login_required
+def list_invites():
+    """List all invite codes (admin only)"""
+    if not current_user.is_admin():
+        return Response(response="Administrator privileges required", status=403)
+    
+    invites = InviteCode.query.order_by(InviteCode.created_at.desc()).all()
+    return jsonify({
+        "invites": [invite.json() for invite in invites]
+    })
+
+@auth.route('/api/invites/<int:invite_id>', methods=['DELETE'])
+@login_required
+def delete_invite(invite_id):
+    """Delete an invite code (admin only)"""
+    if not current_user.is_admin():
+        return Response(response="Administrator privileges required", status=403)
+    
+    invite = InviteCode.query.get(invite_id)
+    if not invite:
+        return Response(response="Invite code not found", status=404)
+    
+    db.session.delete(invite)
+    db.session.commit()
+    
     return Response(status=200)
 
 @auth.route('/api/loggedin', methods=['GET'])
 def loggedin():
     if not current_user.is_authenticated:
         return Response(response='false', status=200)
-    return Response(response='true', status=200)
+    
+    return jsonify({
+        "user": current_user.json(),
+        "isAdmin": current_user.is_admin()
+    })
+
+@auth.route('/api/profile', methods=['GET'])
+@login_required
+def get_profile():
+    """Get the current user's profile"""
+    return jsonify({
+        "user": current_user.json()
+    })
+
+@auth.route('/api/profile', methods=['PUT'])
+@login_required
+def update_profile():
+    """Update the current user's profile"""
+    display_name = request.json.get('display_name')
+    email = request.json.get('email')
+    
+    # Check if email already exists (if being changed)
+    if email and email != current_user.email:
+        existing_email = User.query.filter_by(email=email).first()
+        if existing_email:
+            return Response(response="Email already exists", status=400)
+    
+    # Update user fields
+    if display_name:
+        current_user.display_name = display_name
+    
+    if email:
+        current_user.email = email
+    
+    db.session.commit()
+    
+    return jsonify({
+        "user": current_user.json()
+    })
+
+@auth.route('/api/change-password', methods=['POST'])
+@login_required
+def change_password():
+    """Change the current user's password"""
+    current_password = request.json.get('current_password')
+    new_password = request.json.get('new_password')
+    
+    if not current_password or not new_password:
+        return Response(response="Current password and new password are required", status=400)
+    
+    # LDAP users can't change password through this interface
+    if current_user.ldap:
+        return Response(response="LDAP users cannot change password", status=400)
+    
+    # Verify current password
+    if not check_password_hash(current_user.password, current_password):
+        return Response(response="Current password is incorrect", status=400)
+    
+    # Update password
+    current_user.password = generate_password_hash(new_password, method='sha256')
+    db.session.commit()
+    
+    return Response(status=200)
+
+@auth.route('/api/users', methods=['GET'])
+@login_required
+def list_users():
+    """List all users (admin only)"""
+    if not current_user.is_admin():
+        return Response(response="Administrator privileges required", status=403)
+    
+    users = User.query.all()
+    return jsonify({
+        "users": [user.json() for user in users]
+    })
+
+@auth.route('/api/users/<int:user_id>', methods=['PUT'])
+@login_required
+def update_user(user_id):
+    """Update a user (admin only)"""
+    if not current_user.is_admin():
+        return Response(response="Administrator privileges required", status=403)
+    
+    user = User.query.get(user_id)
+    if not user:
+        return Response(response="User not found", status=404)
+    
+    # Don't allow modifying the user's own admin status
+    if user.id == current_user.id and 'role' in request.json:
+        return Response(response="Cannot modify your own admin status", status=400)
+    
+    # Update user fields
+    if 'display_name' in request.json:
+        user.display_name = request.json['display_name']
+    
+    if 'email' in request.json:
+        # Check if email already exists
+        if request.json['email'] and request.json['email'] != user.email:
+            existing_email = User.query.filter_by(email=request.json['email']).first()
+            if existing_email:
+                return Response(response="Email already exists", status=400)
+        user.email = request.json['email']
+    
+    if 'role' in request.json:
+        user.role = request.json['role']
+        user.admin = (request.json['role'] == UserRole.ADMIN.value)
+    
+    if 'status' in request.json:
+        user.status = request.json['status']
+    
+    db.session.commit()
+    
+    return jsonify({
+        "user": user.json()
+    })
+
+@auth.route('/api/users/<int:user_id>', methods=['DELETE'])
+@login_required
+def delete_user(user_id):
+    """Delete a user (admin only)"""
+    if not current_user.is_admin():
+        return Response(response="Administrator privileges required", status=403)
+    
+    # Don't allow deleting self
+    if user_id == current_user.id:
+        return Response(response="Cannot delete your own account", status=400)
+    
+    user = User.query.get(user_id)
+    if not user:
+        return Response(response="User not found", status=404)
+    
+    db.session.delete(user)
+    db.session.commit()
+    
+    return Response(status=200)
 
 @auth.route('/api/logout', methods=['POST'])
 def logout():
