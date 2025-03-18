@@ -30,29 +30,45 @@ const UpdateDetailsModal = ({ open, close, videoId, currentTitle, currentDescrip
   const [game, setGame] = React.useState('')
   const [tags, setTags] = React.useState([])
   const [confirmDelete, setConfirmDelete] = React.useState(false)
-  const [, setLoading] = React.useState(false)
+  const [loading, setLoading] = React.useState(false)
+  const [gameLoading, setGameLoading] = React.useState(false)
   
   // Load video game and tags when modal opens
   React.useEffect(() => {
     if (open && videoId) {
       setLoading(true)
+      setGameLoading(true) // Set game loading state
+      console.log("Loading video details for videoId:", videoId)
       
       // Load the game
       VideoService.getVideoGame(videoId)
         .then(response => {
+          console.log("Game API response:", response.data)
           if (response.data && response.data.game) {
+            console.log("Setting game to:", response.data.game)
             setGame(response.data.game)
+          } else {
+            // Reset game if none is set
+            console.log("No game found for video, resetting")
+            setGame('')
           }
         })
         .catch(error => {
           console.error('Error loading game:', error)
         })
+        .finally(() => {
+          setGameLoading(false) // Clear game loading state
+        })
       
       // Load the tags
       VideoService.getVideoTags(videoId)
         .then(response => {
+          console.log("Tags API response:", response.data)
           if (response.data && response.data.tags) {
             setTags(response.data.tags.map(tag => tag.name))
+          } else {
+            // Reset tags if none are set
+            setTags([])
           }
         })
         .catch(error => {
@@ -61,6 +77,11 @@ const UpdateDetailsModal = ({ open, close, videoId, currentTitle, currentDescrip
         .finally(() => {
           setLoading(false)
         })
+    } else if (!open) {
+      // Reset when modal closes
+      setGame('')
+      setTags([])
+      setGameLoading(false)
     }
   }, [open, videoId])
 
@@ -81,10 +102,10 @@ const UpdateDetailsModal = ({ open, close, videoId, currentTitle, currentDescrip
     try {
       await VideoService.updateDetails(videoId, update)
       
-      // Then update game
-      if (game) {
-        await VideoService.setVideoGame(videoId, game)
-      }
+      // Then update game - ALWAYS send the game to ensure it's set
+      // (The API will handle cases where game is empty by returning an appropriate error)
+      console.log("Sending game update:", game)
+      await VideoService.setVideoGame(videoId, game)
       
       // Then update tags if provided
       if (tags.length > 0) {
@@ -97,6 +118,7 @@ const UpdateDetailsModal = ({ open, close, videoId, currentTitle, currentDescrip
         message: 'Video details, game, and tags updated!',
       })
     } catch (err) {
+      console.error("Error saving video details:", err)
       alertHandler({
         open: true,
         type: 'error',
@@ -170,6 +192,7 @@ const UpdateDetailsModal = ({ open, close, videoId, currentTitle, currentDescrip
           <GameSelector 
             initialGame={game}
             onChange={setGame}
+            loading={gameLoading}
             sx={{ width: '100%', mb: 2 }}
           />
           

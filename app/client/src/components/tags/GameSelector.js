@@ -1,23 +1,46 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Autocomplete from '@mui/material/Autocomplete';
 import TextField from '@mui/material/TextField';
 import { CircularProgress } from '@mui/material';
 import VideoService from '../../services/VideoService';
+
+// Debounce function to limit API calls
+const useDebounce = (value, delay) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  
+  useEffect(() => {
+    // Update debounced value after delay
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+    
+    // Cancel the timeout if value changes or unmounts
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+  
+  return debouncedValue;
+};
 
 /**
  * Game selector component with autocomplete
  * @param {Object} props
  * @param {string} props.initialGame - Initial game to display
  * @param {Function} props.onChange - Callback when game changes
+ * @param {boolean} props.loading - External loading state, e.g. when initial game is being loaded
  * @param {Object} props.sx - Additional styles
  */
-const GameSelector = ({ initialGame = '', onChange, sx = {} }) => {
+const GameSelector = ({ initialGame = '', onChange, loading: externalLoading = false, sx = {} }) => {
   const [inputValue, setInputValue] = useState('');
   const [selectedGame, setSelectedGame] = useState(initialGame);
   const [options, setOptions] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [allGames, setAllGames] = useState([]);
   const [open, setOpen] = useState(false);
+  
+  // Combine external loading (from parent) with internal search loading
+  const loading = externalLoading || searchLoading;
 
   // Load all games on component mount
   useEffect(() => {
@@ -38,17 +61,30 @@ const GameSelector = ({ initialGame = '', onChange, sx = {} }) => {
   }, []);
   
   // When the initialGame changes (from parent component), update the selectedGame
+  // The useRef prevents the inputValue update from causing an infinite loop
+  const prevInitialGameRef = useRef(initialGame);
+  
   useEffect(() => {
-    if (initialGame) {
-      setSelectedGame(initialGame);
+    // Set the selectedGame whenever initialGame changes
+    setSelectedGame(initialGame);
+    
+    // Only update input if initialGame changed and input doesn't match it yet
+    if (initialGame !== prevInitialGameRef.current) {
+      setInputValue(initialGame || '');
+      prevInitialGameRef.current = initialGame;
     }
+    
+    console.log("GameSelector initialGame changed:", initialGame);
   }, [initialGame]);
+
+  // Debounce the input value to avoid excessive API calls (300ms delay)
+  const debouncedInputValue = useDebounce(inputValue, 300);
 
   // Load games matching input value or show all games when dropdown is open
   useEffect(() => {
     let active = true;
 
-    if (inputValue === '') {
+    if (debouncedInputValue === '') {
       if (open) {
         // Show all games when the dropdown is open and input is empty
         setOptions(allGames);
@@ -59,11 +95,12 @@ const GameSelector = ({ initialGame = '', onChange, sx = {} }) => {
       return undefined;
     }
 
-    setLoading(true);
+    setSearchLoading(true);
+    console.log('Searching games with debounced value:', debouncedInputValue);
 
     (async () => {
       try {
-        const response = await VideoService.searchGames(inputValue);
+        const response = await VideoService.searchGames(debouncedInputValue);
         if (active) {
           let newOptions = [];
           
@@ -76,18 +113,18 @@ const GameSelector = ({ initialGame = '', onChange, sx = {} }) => {
           newOptions = [...new Set([...newOptions])];
           
           setOptions(newOptions);
-          setLoading(false);
+          setSearchLoading(false);
         }
       } catch (error) {
         console.error('Error fetching games:', error);
-        setLoading(false);
+        setSearchLoading(false);
       }
     })();
 
     return () => {
       active = false;
     };
-  }, [inputValue, selectedGame, open, allGames]);
+  }, [debouncedInputValue, selectedGame, open, allGames]);
 
   // When game changes, notify parent
   useEffect(() => {

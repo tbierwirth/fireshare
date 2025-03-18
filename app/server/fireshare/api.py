@@ -13,7 +13,7 @@ from pathlib import Path
 
 
 from . import db
-from .models import Video, VideoInfo, VideoView, Tag, Folder, Game
+from .models import Video, VideoInfo, VideoView, Tag, Folder, Game, video_tags
 from .constants import SUPPORTED_FILE_TYPES
 
 templates_path = os.environ.get('TEMPLATE_PATH') or 'templates'
@@ -403,12 +403,19 @@ def get_games():
     """Get all games"""
     games = Game.query.order_by(Game.name).all()
     
-    # Manually count videos for each game
+    # Manually count videos for each game with extra debugging
     games_with_count = []
     for game in games:
         game_json = game.json()
-        game_json["video_count"] = Video.query.filter_by(game_id=game.id).count()
+        video_count = Video.query.filter_by(game_id=game.id).count()
+        game_json["video_count"] = video_count
+        current_app.logger.debug(f"Game {game.name} (ID: {game.id}) has {video_count} videos")
         games_with_count.append(game_json)
+    
+    # Log overall game counts
+    total_videos = Video.query.count()
+    videos_with_games = Video.query.filter(Video.game_id.isnot(None)).count()
+    current_app.logger.info(f"Total videos: {total_videos}, Videos with games: {videos_with_games}")
         
     return jsonify({"games": games_with_count})
 
@@ -427,7 +434,9 @@ def search_games():
     games_with_count = []
     for game in games:
         game_json = game.json()
-        game_json["video_count"] = Video.query.filter_by(game_id=game.id).count()
+        video_count = Video.query.filter_by(game_id=game.id).count()
+        game_json["video_count"] = video_count
+        current_app.logger.debug(f"Game {game.name} (ID: {game.id}) has {video_count} videos")
         games_with_count.append(game_json)
         
     return jsonify({"games": games_with_count})

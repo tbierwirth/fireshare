@@ -220,22 +220,35 @@ def scan_video(ctx, path, game, tags, owner_id):
                 info = VideoInfo.query.filter(VideoInfo.video_id==video_id).one()
 
                 # Set game and apply tags after video is fully created
-                if game:
-                    logger.info(f"Setting game for new video {video_id}: {game}")
-                    v.set_game(game)
+                try:
+                    if game:
+                        logger.info(f"Setting game for new video {video_id}: {game}")
+                        # Get a fresh copy of the video object to avoid detached instance errors
+                        fresh_video = Video.query.filter_by(video_id=video_id).first()
+                        if fresh_video:
+                            fresh_video.set_game(game)
+                        else:
+                            logger.error(f"Could not find video {video_id} to set game")
+                    
+                    if tags:
+                        # Always refresh the video object from the database to ensure it's attached to a session
+                        video_obj = Video.query.filter_by(video_id=video_id).first()
+                        if video_obj:
+                            tag_list = [t.strip() for t in tags.split(',')]
+                            logger.info(f"Adding tags to new video {video_id}: {tag_list}")
+                            for tag_name in tag_list:
+                                if tag_name:
+                                    video_obj.add_tag(tag_name)
+                        else:
+                            logger.error(f"Could not find video {video_id} to add tags")
+                    
+                    db.session.commit()
+                except Exception as e:
+                    logger.error(f"Error setting game or tags: {str(e)}")
+                    db.session.rollback()
+                    # Continue with poster creation even if game/tag setting failed
                 
-                if tags:
-                    # Refresh the video object from the database to ensure it's attached to a session
-                    video_obj = Video.query.filter_by(video_id=video_id).first()
-                    if video_obj:
-                        tag_list = [t.strip() for t in tags.split(',')]
-                        logger.info(f"Adding tags to new video {video_id}: {tag_list}")
-                        for tag_name in tag_list:
-                            if tag_name:
-                                video_obj.add_tag(tag_name)
-                
-                db.session.commit()
-
+                # Always proceed with poster creation, even if there were errors above
                 processed_root = Path(current_app.config['PROCESSED_DIRECTORY'])
                 logger.info(f"Checking for videos with missing posters...")
                 derived_path = Path(processed_root, "derived", info.video_id)

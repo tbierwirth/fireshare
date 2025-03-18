@@ -273,23 +273,89 @@ class Video(db.Model):
     
     def set_game(self, game_name):
         """Set the game for this video and create/assign to the corresponding folder"""
-        game = Game.find_or_create(game_name)
-        self.game_id = game.id
+        import logging
+        logger = logging.getLogger('fireshare')
         
-        # Assign to the game's folder
+        logger.info(f"Setting game for video {self.video_id} to '{game_name}'")
+        
+        # Avoid detached instance error by working with fresh database objects
+        # and explicit SQL updates instead of ORM operations on potentially detached objects
+        
+        # First get or create the game
+        game = Game.find_or_create(game_name)
+        logger.info(f"Game found/created with ID: {game.id}, name: {game.name}")
+        
+        # Create the folder for the game if needed
         folder = Folder.for_game(game)
-        self.folder_id = folder.id
+        logger.info(f"Folder for game: {folder.id} - {folder.name}")
+        
+        # Use a direct SQL update to avoid detached instance errors
+        try:
+            # Update the video with the game_id and folder_id
+            db.session.query(Video).filter_by(video_id=self.video_id).update({
+                "game_id": game.id, 
+                "folder_id": folder.id
+            })
+            logger.info(f"Explicitly updated video {self.video_id} with game_id={game.id} and folder_id={folder.id}")
             
-        db.session.commit()
-        return game
+            # Commit the changes
+            db.session.commit()
+            logger.info(f"Changes committed for video {self.video_id}")
+            
+            # Update the instance attributes to reflect the database changes
+            # (important for code that might access self.game_id after this method returns)
+            self.game_id = game.id
+            self.folder_id = folder.id
+            
+            # Verify the update worked
+            video = Video.query.filter_by(video_id=self.video_id).first()
+            logger.info(f"After commit, video {video.video_id} has game_id={video.game_id}")
+            
+            return game
+        except Exception as e:
+            logger.error(f"Error updating video: {str(e)}")
+            db.session.rollback()
+            raise e
     
     def add_tag(self, tag_name):
         """Add a tag to the video (pure categorization, doesn't affect folder)"""
-        tag = Tag.find_or_create(tag_name)
-        if tag not in self.tags:
-            self.tags.append(tag)
-        db.session.commit()
-        return tag
+        import logging
+        logger = logging.getLogger('fireshare')
+        
+        logger.info(f"Adding tag '{tag_name}' to video {self.video_id}")
+        
+        # Avoid detached instance error by working with explicit SQL operations
+        try:
+            # First get or create the tag
+            tag = Tag.find_or_create(tag_name)
+            logger.info(f"Tag found/created with ID: {tag.id}, name: {tag.name}")
+            
+            # Check if this video already has this tag by querying the association table directly
+            existing = db.session.query(video_tags).filter_by(
+                video_id=self.video_id, 
+                tag_id=tag.id
+            ).first()
+            
+            if not existing:
+                # If the tag is not already associated, create the association
+                logger.info(f"Adding association between video {self.video_id} and tag {tag.name}")
+                
+                # Insert directly into the association table
+                stmt = video_tags.insert().values(
+                    video_id=self.video_id,
+                    tag_id=tag.id
+                )
+                db.session.execute(stmt)
+                db.session.commit()
+                logger.info(f"Successfully added tag {tag.name} to video {self.video_id}")
+            else:
+                logger.info(f"Video {self.video_id} already has tag {tag.name}")
+                
+            return tag
+        except Exception as e:
+            logger.error(f"Error adding tag to video: {str(e)}")
+            db.session.rollback()
+            raise e
     
     def json(self):
         j = {

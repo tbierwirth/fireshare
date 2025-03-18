@@ -1,9 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Autocomplete from '@mui/material/Autocomplete';
 import TextField from '@mui/material/TextField';
 import Chip from '@mui/material/Chip';
 import { CircularProgress } from '@mui/material';
 import VideoService from '../../services/VideoService';
+
+// Debounce function to limit API calls
+const useDebounce = (value, delay) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  
+  useEffect(() => {
+    // Update debounced value after delay
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+    
+    // Cancel the timeout if value changes or unmounts
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+  
+  return debouncedValue;
+};
 
 /**
  * Tag input component with autocomplete
@@ -18,21 +37,25 @@ const TagInput = ({ initialTags = [], onChange, label = "Tags", sx = {} }) => {
   const [selectedTags, setSelectedTags] = useState(initialTags);
   const [options, setOptions] = useState([]);
   const [loading, setLoading] = useState(false);
+  
+  // Debounce the input value to avoid excessive API calls (300ms delay)
+  const debouncedInputValue = useDebounce(inputValue, 300);
 
-  // Load tags matching input value
+  // Load tags matching input value - only when debounced value changes
   useEffect(() => {
     let active = true;
 
-    if (inputValue === '') {
+    if (debouncedInputValue === '') {
       setOptions(selectedTags);
       return undefined;
     }
 
     setLoading(true);
+    console.log('Searching tags with debounced value:', debouncedInputValue);
 
     (async () => {
       try {
-        const response = await VideoService.searchTags(inputValue);
+        const response = await VideoService.searchTags(debouncedInputValue);
         if (active) {
           let newOptions = [];
           
@@ -56,7 +79,7 @@ const TagInput = ({ initialTags = [], onChange, label = "Tags", sx = {} }) => {
     return () => {
       active = false;
     };
-  }, [inputValue, selectedTags]);
+  }, [debouncedInputValue, selectedTags]);
 
   // When tags change, notify parent
   useEffect(() => {
