@@ -402,7 +402,15 @@ def get_video():
 def get_games():
     """Get all games"""
     games = Game.query.order_by(Game.name).all()
-    return jsonify({"games": [game.json() for game in games]})
+    
+    # Manually count videos for each game
+    games_with_count = []
+    for game in games:
+        game_json = game.json()
+        game_json["video_count"] = Video.query.filter_by(game_id=game.id).count()
+        games_with_count.append(game_json)
+        
+    return jsonify({"games": games_with_count})
 
 @api.route('/api/games/search', methods=['GET'])
 def search_games():
@@ -414,7 +422,15 @@ def search_games():
     # Convert query to lowercase for case-insensitive matching
     query = f"%{query.lower()}%"
     games = Game.query.filter(Game.slug.like(Game.generate_slug(query))).all()
-    return jsonify({"games": [game.json() for game in games]})
+    
+    # Manually count videos for each game
+    games_with_count = []
+    for game in games:
+        game_json = game.json()
+        game_json["video_count"] = Video.query.filter_by(game_id=game.id).count()
+        games_with_count.append(game_json)
+        
+    return jsonify({"games": games_with_count})
 
 @api.route('/api/video/<video_id>/game', methods=['GET', 'PUT'])
 def handle_video_game(video_id):
@@ -442,7 +458,16 @@ def handle_video_game(video_id):
 def get_tags():
     """Get all tags"""
     tags = Tag.query.order_by(Tag.name).all()
-    return jsonify({"tags": [tag.json() for tag in tags]})
+    
+    # Manually count videos for each tag
+    tags_with_count = []
+    for tag in tags:
+        tag_json = tag.json()
+        # For tags, we need to count through the association table
+        tag_json["video_count"] = db.session.query(video_tags).filter_by(tag_id=tag.id).count()
+        tags_with_count.append(tag_json)
+        
+    return jsonify({"tags": tags_with_count})
 
 @api.route('/api/tags/search', methods=['GET'])
 def search_tags():
@@ -454,13 +479,30 @@ def search_tags():
     # Convert query to lowercase for case-insensitive matching
     query = f"%{query.lower()}%"
     tags = Tag.query.filter(Tag.slug.like(Tag.generate_slug(query))).all()
-    return jsonify({"tags": [tag.json() for tag in tags]})
+    
+    # Manually count videos for each tag
+    tags_with_count = []
+    for tag in tags:
+        tag_json = tag.json()
+        # For tags, we need to count through the association table
+        tag_json["video_count"] = db.session.query(video_tags).filter_by(tag_id=tag.id).count()
+        tags_with_count.append(tag_json)
+        
+    return jsonify({"tags": tags_with_count})
 
 @api.route('/api/folders', methods=['GET'])
 def get_folders():
     """Get all folders"""
     folders = Folder.query.order_by(Folder.name).all()
-    return jsonify({"folders": [folder.json() for folder in folders]})
+    
+    # Manually count videos for each folder
+    folders_with_count = []
+    for folder in folders:
+        folder_json = folder.json()
+        folder_json["video_count"] = Video.query.filter_by(folder_id=folder.id).count()
+        folders_with_count.append(folder_json)
+        
+    return jsonify({"folders": folders_with_count})
 
 @api.route('/api/video/<video_id>/tags', methods=['GET', 'POST'])
 def handle_video_tags(video_id):
@@ -470,7 +512,14 @@ def handle_video_tags(video_id):
         return jsonify({"error": "Video not found"}), 404
         
     if request.method == 'GET':
-        return jsonify({"tags": [tag.json() for tag in video.tags]})
+        tags_with_count = []
+        for tag in video.tags:
+            tag_json = tag.json()
+            # For tags, we need to count through the association table
+            tag_json["video_count"] = db.session.query(video_tags).filter_by(tag_id=tag.id).count()
+            tags_with_count.append(tag_json)
+            
+        return jsonify({"tags": tags_with_count})
         
     if request.method == 'POST':
         if not current_user.is_authenticated:

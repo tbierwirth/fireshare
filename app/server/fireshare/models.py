@@ -238,7 +238,7 @@ class Folder(db.Model):
             "game": self.game.name if hasattr(self, 'game') and self.game else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
-            "video_count": len(self.videos) if self.videos else 0
+            "video_count": 0  # This will be calculated separately in the API endpoints
         }
 
 # Association table for the many-to-many relationship between videos and tags

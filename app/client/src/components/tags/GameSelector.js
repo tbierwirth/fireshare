@@ -36,6 +36,13 @@ const GameSelector = ({ initialGame = '', onChange, sx = {} }) => {
 
     fetchAllGames();
   }, []);
+  
+  // When the initialGame changes (from parent component), update the selectedGame
+  useEffect(() => {
+    if (initialGame) {
+      setSelectedGame(initialGame);
+    }
+  }, [initialGame]);
 
   // Load games matching input value or show all games when dropdown is open
   useEffect(() => {
