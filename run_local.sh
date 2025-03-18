@@ -6,5 +6,5 @@ python3 -m venv venv
 python3 -m pip install -r app/server/requirements.txt
 cd app/server && python3 setup.py install && cd ../..
 
-python3 -m flask db upgrade
+python3 -m flask db upgrade --directory=migrations
 python3 -m flask run --with-threads
