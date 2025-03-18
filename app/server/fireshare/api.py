@@ -13,7 +13,7 @@ from pathlib import Path
 
 
 from . import db
-from .models import Video, VideoInfo, VideoView
+from .models import Video, VideoInfo, VideoView, Tag, Folder
 from .constants import SUPPORTED_FILE_TYPES
 
 templates_path = os.environ.get('TEMPLATE_PATH') or 'templates'
@@ -239,35 +239,55 @@ def public_upload_video():
             config = json.load(configfile)
         except:
             logging.error("Invalid or corrupt config file")
-            return Response(status=400)
+            return jsonify({"error": "Invalid or corrupt config file"}), 400
         configfile.close()
         
     if not config['app_config']['allow_public_upload']:
         logging.warn("A public upload attempt was made but public uploading is disabled")
-        return Response(status=401)
+        return jsonify({"error": "Public uploads are disabled"}), 401
     
     upload_folder = config['app_config']['public_upload_folder_name']
 
     if 'file' not in request.files:
-        return Response(status=400)
+        return jsonify({"error": "No file provided"}), 400
+        
     file = request.files['file']
     if file.filename == '':
-        return Response(status=400)
+        return jsonify({"error": "Empty filename"}), 400
+        
     filename = file.filename
     filetype = file.filename.split('.')[-1]
     if not filetype in SUPPORTED_FILE_TYPES:
-        return Response(status=400)
+        return jsonify({"error": f"Unsupported file type: {filetype}"}), 400
+        
+    tags = request.form.getlist('tags[]') if 'tags[]' in request.form else []
+    
     upload_directory = paths['video'] / upload_folder
     if not os.path.exists(upload_directory):
         os.makedirs(upload_directory)
+        
     save_path = os.path.join(upload_directory, filename)
     if (os.path.exists(save_path)):
         name_no_type = ".".join(filename.split('.')[0:-1])
         uid = ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(6))
         save_path = os.path.join(paths['video'], upload_folder, f"{name_no_type}-{uid}.{filetype}")
+        
     file.save(save_path)
-    Popen(f"fireshare scan-video --path=\"{save_path}\"", shell=True)
-    return Response(status=201)
+    
+    # Scan the video
+    cmd = f"fireshare scan-video --path=\"{save_path}\""
+    
+    # Add tags if provided - we'll need to modify the CLI to support this
+    if tags:
+        tag_list = ','.join(tags)
+        cmd += f" --tags=\"{tag_list}\""
+        
+    Popen(cmd, shell=True)
+    
+    return jsonify({
+        "message": "Video uploaded successfully", 
+        "tags": tags
+    }), 201
 
 @api.route('/api/upload', methods=['POST'])
 @login_required
@@ -277,31 +297,54 @@ def upload_video():
         try:
             config = json.load(configfile)
         except:
-            return Response(status=500, response="Invalid or corrupt config file")
+            return jsonify({"error": "Invalid or corrupt config file"}), 500
         configfile.close()
     
     upload_folder = config['app_config']['admin_upload_folder_name']
 
     if 'file' not in request.files:
-        return Response(status=400)
+        return jsonify({"error": "No file provided"}), 400
+        
     file = request.files['file']
     if file.filename == '':
-        return Response(status=400)
+        return jsonify({"error": "Empty filename"}), 400
+        
     filename = file.filename
     filetype = file.filename.split('.')[-1]
     if not filetype in SUPPORTED_FILE_TYPES:
-        return Response(status=400)
+        return jsonify({"error": f"Unsupported file type: {filetype}"}), 400
+        
+    tags = request.form.getlist('tags[]') if 'tags[]' in request.form else []
+    
     upload_directory = paths['video'] / upload_folder
     if not os.path.exists(upload_directory):
         os.makedirs(upload_directory)
+        
     save_path = os.path.join(upload_directory, filename)
     if (os.path.exists(save_path)):
         name_no_type = ".".join(filename.split('.')[0:-1])
         uid = ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(6))
         save_path = os.path.join(paths['video'], upload_folder, f"{name_no_type}-{uid}.{filetype}")
+        
     file.save(save_path)
-    Popen(f"fireshare scan-video --path=\"{save_path}\"", shell=True)
-    return Response(status=201)
+    
+    # Scan the video
+    cmd = f"fireshare scan-video --path=\"{save_path}\""
+    
+    # Add tags if provided - we'll need to modify the CLI to support this
+    if tags:
+        tag_list = ','.join(tags)
+        cmd += f" --tags=\"{tag_list}\""
+        
+    # Add owner info
+    cmd += f" --owner-id={current_user.id}"
+    
+    Popen(cmd, shell=True)
+    
+    return jsonify({
+        "message": "Video uploaded successfully",
+        "tags": tags
+    }), 201
 
 @api.route('/api/video')
 def get_video():
@@ -335,6 +378,98 @@ def get_video():
     rv = Response(chunk, 206, mimetype='video/mp4', content_type='video/mp4', direct_passthrough=True)
     rv.headers.add('Content-Range', 'bytes {0}-{1}/{2}'.format(start, start + length - 1, file_size))
     return rv
+
+# Tag and Folder API endpoints
+@api.route('/api/tags', methods=['GET'])
+def get_tags():
+    """Get all tags"""
+    tags = Tag.query.order_by(Tag.name).all()
+    return jsonify({"tags": [tag.json() for tag in tags]})
+
+@api.route('/api/tags/search', methods=['GET'])
+def search_tags():
+    """Search for tags by name (case-insensitive partial match)"""
+    query = request.args.get('q', '')
+    if not query:
+        return jsonify({"tags": []})
+    
+    # Convert query to lowercase for case-insensitive matching
+    query = f"%{query.lower()}%"
+    tags = Tag.query.filter(Tag.slug.like(Tag.generate_slug(query))).all()
+    return jsonify({"tags": [tag.json() for tag in tags]})
+
+@api.route('/api/folders', methods=['GET'])
+def get_folders():
+    """Get all folders"""
+    folders = Folder.query.order_by(Folder.name).all()
+    return jsonify({"folders": [folder.json() for folder in folders]})
+
+@api.route('/api/video/<video_id>/tags', methods=['GET', 'POST'])
+def handle_video_tags(video_id):
+    """Handle video tags (get or add)"""
+    video = Video.query.filter_by(video_id=video_id).first()
+    if not video:
+        return jsonify({"error": "Video not found"}), 404
+        
+    if request.method == 'GET':
+        return jsonify({"tags": [tag.json() for tag in video.tags]})
+        
+    if request.method == 'POST':
+        if not current_user.is_authenticated:
+            return jsonify({"error": "Authentication required"}), 401
+            
+        tag_names = request.json.get('tags', [])
+        if not tag_names:
+            return jsonify({"error": "No tags provided"}), 400
+            
+        added_tags = []
+        for tag_name in tag_names:
+            added_tag = video.add_tag(tag_name)
+            added_tags.append(added_tag.json())
+            
+        return jsonify({"added_tags": added_tags}), 201
+
+@api.route('/api/video/<video_id>/folder', methods=['PUT'])
+@login_required
+def update_video_folder(video_id):
+    """Update a video's folder"""
+    video = Video.query.filter_by(video_id=video_id).first()
+    if not video:
+        return jsonify({"error": "Video not found"}), 404
+        
+    folder_id = request.json.get('folder_id')
+    if not folder_id:
+        return jsonify({"error": "No folder ID provided"}), 400
+        
+    folder = Folder.query.get(folder_id)
+    if not folder:
+        return jsonify({"error": "Folder not found"}), 404
+        
+    video.folder_id = folder.id
+    db.session.commit()
+    
+    return jsonify({"message": "Folder updated successfully"}), 200
+
+@api.route('/api/tags/<tag_id>', methods=['DELETE'])
+@login_required
+def delete_tag(tag_id):
+    """Delete a tag (admin only)"""
+    if not current_user.is_admin():
+        return jsonify({"error": "Admin access required"}), 403
+        
+    tag = Tag.query.get(tag_id)
+    if not tag:
+        return jsonify({"error": "Tag not found"}), 404
+        
+    # Remove the tag from all videos
+    for video in tag.videos:
+        video.tags.remove(tag)
+        
+    # Delete the tag
+    db.session.delete(tag)
+    db.session.commit()
+    
+    return jsonify({"message": "Tag deleted successfully"}), 200
 
 @api.after_request
 def after_request(response):

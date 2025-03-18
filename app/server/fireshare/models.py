@@ -1,6 +1,7 @@
 import json
 import datetime
 import enum
+import re
 from flask_login import UserMixin
 from . import db
 
@@ -84,6 +85,102 @@ class InviteCode(db.Model):
             "status": self.status
         }
 
+class Tag(db.Model):
+    __tablename__ = "tag"
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)  # Original display name with proper casing
+    slug = db.Column(db.String(100), nullable=False, unique=True, index=True)  # Lowercase, slugified version for matching
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    
+    # Relationships
+    folder = db.relationship('Folder', backref='tag', uselist=False)
+    
+    def __repr__(self):
+        return f"<Tag {self.name}>"
+    
+    @classmethod
+    def generate_slug(cls, name):
+        """Create a slug from the name"""
+        # Convert to lowercase and replace spaces with hyphens
+        return re.sub(r'[^a-z0-9-]', '', name.lower().replace(' ', '-'))
+    
+    @classmethod
+    def find_or_create(cls, name):
+        """Find a tag by name (case insensitive) or create a new one"""
+        slug = cls.generate_slug(name)
+        tag = cls.query.filter_by(slug=slug).first()
+        if not tag:
+            tag = cls(name=name, slug=slug)
+            db.session.add(tag)
+            db.session.commit()
+        return tag
+    
+    def json(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "slug": self.slug,
+            "folder_id": self.folder.id if self.folder else None,
+            "video_count": len(self.folder.videos) if self.folder else 0 if self.folder else 0
+        }
+
+class Folder(db.Model):
+    __tablename__ = "folder"
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(255), nullable=False)
+    slug = db.Column(db.String(255), nullable=False, unique=True, index=True)
+    description = db.Column(db.Text, nullable=True)
+    parent_id = db.Column(db.Integer, db.ForeignKey('folder.id'), nullable=True)
+    tag_id = db.Column(db.Integer, db.ForeignKey('tag.id'), nullable=True, unique=True)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    
+    # Relationships
+    parent = db.relationship('Folder', remote_side=[id], backref=db.backref('children', lazy='dynamic'))
+    videos = db.relationship('Video', backref=db.backref('folder', lazy=True), foreign_keys="[Video.folder_id]")
+    
+    def __repr__(self):
+        return f"<Folder {self.name}>"
+    
+    @classmethod
+    def for_tag(cls, tag_name):
+        """Get or create a folder for a tag"""
+        tag = Tag.find_or_create(tag_name)
+        folder = cls.query.filter_by(tag_id=tag.id).first()
+        if not folder:
+            folder = cls(
+                name=tag.name,
+                slug=tag.slug,
+                description=f"Videos tagged with {tag.name}",
+                tag_id=tag.id
+            )
+            db.session.add(folder)
+            db.session.commit()
+        return folder
+    
+    def json(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "slug": self.slug,
+            "description": self.description,
+            "parent_id": self.parent_id,
+            "tag": self.tag.name if self.tag else None,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "video_count": len(self.videos) if self.videos else 0
+        }
+
+# Association table for the many-to-many relationship between videos and tags
+video_tags = db.Table('video_tags',
+    db.Column('video_id', db.String(32), db.ForeignKey('video.video_id'), primary_key=True),
+    db.Column('tag_id', db.Integer, db.ForeignKey('tag.id'), primary_key=True),
+    db.Column('created_at', db.DateTime, default=datetime.datetime.utcnow)
+)
+
 class Video(db.Model):
     __tablename__ = "video"
 
@@ -92,11 +189,32 @@ class Video(db.Model):
     extension = db.Column(db.String(8), nullable=False)
     path      = db.Column(db.String(2048), index=True, nullable=False)
     available = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime())
-    updated_at = db.Column(db.DateTime())
-
-    info      = db.relationship("VideoInfo", back_populates="video", uselist=False, lazy="joined")
-
+    created_at = db.Column(db.DateTime(), default=datetime.datetime.utcnow)
+    updated_at = db.Column(db.DateTime(), default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    
+    # New columns for folder and owner
+    folder_id = db.Column(db.Integer, db.ForeignKey('folder.id'), nullable=True)
+    owner_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    
+    # Relationships
+    info = db.relationship("VideoInfo", back_populates="video", uselist=False, lazy="joined")
+    owner = db.relationship('User', backref=db.backref('videos', lazy='dynamic'))
+    tags = db.relationship('Tag', secondary=video_tags, backref=db.backref('videos', lazy='dynamic'))
+    
+    def add_tag(self, tag_name):
+        """Add a tag to the video and assign to the corresponding folder"""
+        tag = Tag.find_or_create(tag_name)
+        if tag not in self.tags:
+            self.tags.append(tag)
+            
+        # Auto-assign to folder based on first tag if no folder is set
+        if not self.folder_id:
+            folder = Folder.for_tag(tag_name)
+            self.folder_id = folder.id
+            
+        db.session.commit()
+        return tag
+    
     def json(self):
         j = {
             "video_id": self.video_id,
@@ -104,6 +222,10 @@ class Video(db.Model):
             "path": self.path,
             "available": self.available,
             "info": self.info.json(),
+            "folder_id": self.folder_id,
+            "folder_name": self.folder.name if self.folder else None,
+            "owner": self.owner.username if self.owner else None,
+            "tags": [tag.name for tag in self.tags]
         }
         return j
 
