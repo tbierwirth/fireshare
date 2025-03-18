@@ -14,6 +14,7 @@ import Typography from '@mui/material/Typography'
 import VideoLibraryIcon from '@mui/icons-material/VideoLibrary'
 import PublicIcon from '@mui/icons-material/Public'
 import SettingsIcon from '@mui/icons-material/Settings'
+import PeopleIcon from '@mui/icons-material/People'
 import LogoutIcon from '@mui/icons-material/Logout'
 import LoginIcon from '@mui/icons-material/Login'
 import GitHubIcon from '@mui/icons-material/GitHub'
@@ -47,6 +48,7 @@ const pages = [
   { title: 'My Videos', icon: <VideoLibraryIcon />, href: '/', private: true },
   { title: 'Public Videos', icon: <PublicIcon />, href: '/feed', private: false },
   { title: 'Settings', icon: <SettingsIcon />, href: '/settings', private: true },
+  { title: 'User Management', icon: <PeopleIcon />, href: '/users', private: true, adminOnly: true },
 ]
 
 const openedMixin = (theme) => ({
@@ -137,9 +139,26 @@ function Navbar20({
   const [open, setOpen] = React.useState(!collapsed)
   const [listStyle, setListStyle] = React.useState(getSetting('listStyle') || 'card')
   const [cardSize, setCardSize] = React.useState(getSetting('cardSize') || CARD_SIZE_DEFAULT)
+  const [isAdmin, setIsAdmin] = React.useState(false)
 
   const [alert, setAlert] = React.useState({ open: false })
   const navigate = useNavigate()
+  
+  // Check admin status when authenticated
+  React.useEffect(() => {
+    const checkAdmin = async () => {
+      if (authenticated) {
+        try {
+          const response = await AuthService.isLoggedIn();
+          setIsAdmin(response.data.isAdmin);
+        } catch (error) {
+          console.error("Error checking admin status:", error);
+        }
+      }
+    };
+
+    checkAdmin();
+  }, [authenticated]);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen)
@@ -215,22 +234,26 @@ function Navbar20({
       <Divider />
       <List sx={{ p: 1 }}>
         {pages.map((p) => {
-          if ((p.private && authenticated) || !p.private)
-            return (
-              <ListItem key={p.title} disablePadding>
-                <ListItemButton selected={page === p.href} onClick={() => navigate(p.href)} sx={{ height: 50, mb: 1 }}>
-                  <ListItemIcon sx={{ minWidth: 40 }}>{p.icon}</ListItemIcon>
-                  <ListItemText
-                    primary={p.title}
-                    primaryTypographyProps={{
-                      fontSize: 18,
-                      fontWeight: 600,
-                    }}
-                  />
-                </ListItemButton>
-              </ListItem>
-            )
-          return null
+          // Skip private pages when not authenticated
+          if (p.private && !authenticated) return null;
+          
+          // Skip admin-only pages when not an admin
+          if (p.adminOnly && !isAdmin) return null;
+          
+          return (
+            <ListItem key={p.title} disablePadding>
+              <ListItemButton selected={page === p.href} onClick={() => navigate(p.href)} sx={{ height: 50, mb: 1 }}>
+                <ListItemIcon sx={{ minWidth: 40 }}>{p.icon}</ListItemIcon>
+                <ListItemText
+                  primary={p.title}
+                  primaryTypographyProps={{
+                    fontSize: 18,
+                    fontWeight: 600,
+                  }}
+                />
+              </ListItemButton>
+            </ListItem>
+          )
         })}
       </List>
       {styleToggle && (

@@ -3,10 +3,12 @@ import { Route, HashRouter as Router, Routes } from 'react-router-dom'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
 import { CssBaseline } from '@mui/material'
 import Login from './views/Login'
+import Register from './views/Register'
 import Watch from './views/Watch'
 import Dashboard from './views/Dashboard'
 import NotFound from './views/NotFound'
 import Settings from './views/Settings'
+import UserSettings from './views/UserSettings'
 import Feed from './views/Feed'
 import darkTheme from './common/darkTheme'
 import { ConfigService } from './services'
@@ -64,11 +66,29 @@ export default function App() {
             }
           />
           <Route
+            path="/register"
+            element={
+              <Navbar20 page="/register">
+                <Register />
+              </Navbar20>
+            }
+          />
+          <Route
             path="/settings"
             element={
               <AuthWrapper collapsed={!drawerOpen} redirect={'/login'}>
                 <Navbar20 page="/settings">
                   <Settings />
+                </Navbar20>
+              </AuthWrapper>
+            }
+          />
+          <Route
+            path="/users"
+            element={
+              <AuthWrapper collapsed={!drawerOpen} redirect={'/login'}>
+                <Navbar20 page="/users">
+                  <UserSettings />
                 </Navbar20>
               </AuthWrapper>
             }
