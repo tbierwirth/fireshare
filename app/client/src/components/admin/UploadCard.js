@@ -1,9 +1,10 @@
 import React from 'react'
-import { Box, Grid, Paper, Stack, Typography } from '@mui/material'
+import { Box, Grid, Paper, Stack, Typography, Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@mui/material'
 import CloudUploadIcon from '@mui/icons-material/CloudUpload'
 import styled from '@emotion/styled'
 import { VideoService } from '../../services'
 import { getSetting } from '../../common/utils'
+import { TagInput } from '../tags'
 
 const Input = styled('input')({
   display: 'none',
@@ -17,13 +18,20 @@ const UploadCard = ({ authenticated, feedView = false, publicUpload = false, fet
   const [isSelected, setIsSelected] = React.useState(false)
   const [progress, setProgress] = React.useState(0)
   const [uploadRate, setUploadRate] = React.useState()
+  const [showTagDialog, setShowTagDialog] = React.useState(false)
+  const [selectedTags, setSelectedTags] = React.useState([])
 
   const uiConfig = getSetting('ui_config')
 
   const changeHandler = (event) => {
     setProgress(0)
-    setSelectedFile(event.target.files[0])
-    setIsSelected(true)
+    const file = event.target.files[0]
+    setSelectedFile(file)
+    
+    // Show tag dialog before starting upload
+    if (file) {
+      setShowTagDialog(true)
+    }
   }
 
   const uploadProgress = (progress, rate) => {
@@ -39,7 +47,21 @@ const UploadCard = ({ authenticated, feedView = false, publicUpload = false, fet
     setProgress(0)
     const file = event.dataTransfer.files[0]
     setSelectedFile(file)
-    setIsSelected(true)
+    
+    // Show tag dialog before starting upload
+    if (file) {
+      setShowTagDialog(true)
+    }
+  }
+  
+  // Handle tag dialog close and upload
+  const handleDialogClose = (shouldUpload = false) => {
+    setShowTagDialog(false)
+    if (!shouldUpload) {
+      setSelectedFile(null)
+    } else {
+      setIsSelected(true)
+    }
   }
 
   // Prevent default behavior for drag events to enable dropping files
@@ -51,6 +73,14 @@ const UploadCard = ({ authenticated, feedView = false, publicUpload = false, fet
     async function upload() {
       const formData = new FormData()
       formData.append('file', selectedFile)
+      
+      // Add tags to form data
+      if (selectedTags && selectedTags.length > 0) {
+        selectedTags.forEach(tag => {
+          formData.append('tags[]', tag)
+        })
+      }
+      
       try {
         if (publicUpload) {
           await VideoService.publicUpload(formData, uploadProgress)
@@ -75,10 +105,11 @@ const UploadCard = ({ authenticated, feedView = false, publicUpload = false, fet
       setProgress(0)
       setUploadRate(null)
       setIsSelected(false)
+      setSelectedTags([])
     }
-    if (selectedFile) upload()
+    if (isSelected && selectedFile) upload()
     // eslint-disable-next-line
-  }, [selectedFile])
+  }, [isSelected])
 
   if (feedView && !uiConfig?.show_public_upload) return null
   if (!feedView && !uiConfig?.show_admin_upload) return null
@@ -152,6 +183,32 @@ const UploadCard = ({ authenticated, feedView = false, publicUpload = false, fet
           />
         </Paper>
       </label>
+      
+      {/* Tag Selection Dialog */}
+      <Dialog open={showTagDialog} onClose={() => handleDialogClose(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Add Tags to Your Video</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            Tags help organize your videos and make them easier to find. Please add game names or other relevant tags.
+          </Typography>
+          <TagInput 
+            onChange={setSelectedTags} 
+            label="Game/Video Tags" 
+            sx={{ width: '100%', mt: 1 }} 
+            initialTags={selectedTags}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => handleDialogClose(false)}>Cancel</Button>
+          <Button 
+            onClick={() => handleDialogClose(true)} 
+            variant="contained" 
+            color="primary"
+          >
+            Upload{selectedTags.length > 0 ? ` with ${selectedTags.length} tag${selectedTags.length !== 1 ? 's' : ''}` : ''}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Grid>
   )
 }

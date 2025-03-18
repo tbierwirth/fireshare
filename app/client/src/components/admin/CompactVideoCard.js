@@ -10,6 +10,7 @@ import VideoService from '../../services/VideoService'
 import _ from 'lodash'
 import UpdateDetailsModal from '../modal/UpdateDetailsModal'
 import LightTooltip from '../misc/LightTooltip'
+import { TagDisplay } from '../tags'
 
 const URL = getUrl()
 const PURL = getPublicWatchUrl()
@@ -345,6 +346,32 @@ const CompactVideoCard = ({ video, openVideoHandler, alertHandler, cardWidth, au
                 {`${video.view_count} ${video.view_count === 1 ? 'View' : 'Views'}`}
               </Typography>
             </Box>
+            
+            {/* Show tags if available */}
+            {video.tags && video.tags.length > 0 && (
+              <Box 
+                sx={{ 
+                  position: 'absolute', 
+                  bottom: 3, 
+                  right: 40, 
+                  left: 40,
+                  display: 'flex',
+                  justifyContent: 'center',
+                  maxWidth: cardWidth - 80,
+                }}
+              >
+                <TagDisplay 
+                  tags={video.tags} 
+                  max={2} 
+                  showCount={true}
+                  sx={{ 
+                    background: 'rgba(0, 0, 0, 0.6)',
+                    borderRadius: '4px',
+                    p: 0.5,
+                  }}
+                />
+              </Box>
+            )}
           </div>
         </Box>
       </Box>

@@ -1,6 +1,7 @@
 import Api from './Api'
 
 const service = {
+  // Video CRUD operations
   getVideos(sort) {
     return Api().get('/api/videos', {
       params: {
@@ -50,6 +51,8 @@ const service = {
   delete(id) {
     return Api().delete(`/api/video/delete/${id}`)
   },
+  
+  // Upload operations
   upload(formData, uploadProgress) {
     return Api().post('/api/upload', formData, {
       timeout: 999999999,
@@ -73,7 +76,6 @@ const service = {
       },
       onUploadProgress: (progressEvent) => {
         const progress = progressEvent.loaded / progressEvent.total
-        console.log(progressEvent)
         uploadProgress(progress, {
           loaded: progressEvent.loaded / Math.pow(10, 6),
           total: progressEvent.total / Math.pow(10, 6),
@@ -84,6 +86,33 @@ const service = {
   scan() {
     return Api().get('/api/manual/scan')
   },
+  
+  // Tag operations
+  getTags() {
+    return Api().get('/api/tags')
+  },
+  searchTags(query) {
+    return Api().get('/api/tags/search', {
+      params: { q: query }
+    })
+  },
+  getVideoTags(videoId) {
+    return Api().get(`/api/video/${videoId}/tags`)
+  },
+  addVideoTags(videoId, tags) {
+    return Api().post(`/api/video/${videoId}/tags`, { tags })
+  },
+  deleteTag(tagId) {
+    return Api().delete(`/api/tags/${tagId}`)
+  },
+  
+  // Folder operations
+  getFolders() {
+    return Api().get('/api/folders')
+  },
+  updateVideoFolder(videoId, folderId) {
+    return Api().put(`/api/video/${videoId}/folder`, { folder_id: folderId })
+  }
 }
 
 export default service

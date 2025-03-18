@@ -6,6 +6,7 @@ import VideoModal from '../modal/VideoModal'
 import SensorsIcon from '@mui/icons-material/Sensors'
 import { VideoService } from '../../services'
 import UploadCard from './UploadCard'
+import { TagDisplay } from '../tags'
 
 const VideoCards = ({
   videos,
