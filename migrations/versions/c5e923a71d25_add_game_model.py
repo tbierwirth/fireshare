@@ -211,21 +211,59 @@ def upgrade():
         print(f"Note: No existing video_tags to migrate: {e}")
     
     # Drop old tables and rename new tables
-    op.drop_table('video_tags')
-    op.drop_table('video')
-    op.drop_table('folder')
+    # Use try-except to handle cases where tables don't exist yet
+    try:
+        op.drop_table('video_tags')
+    except Exception as e:
+        print(f"Note: Could not drop video_tags table: {e}")
     
-    op.rename_table('folder_new', 'folder')
-    op.rename_table('video_new', 'video')
-    op.rename_table('video_tags_new', 'video_tags')
+    try:
+        op.drop_table('video')
+    except Exception as e:
+        print(f"Note: Could not drop video table: {e}")
+    
+    try:
+        op.drop_table('folder')
+    except Exception as e:
+        print(f"Note: Could not drop folder table: {e}")
+    
+    try:
+        op.rename_table('folder_new', 'folder')
+    except Exception as e:
+        print(f"Note: Could not rename folder_new to folder: {e}")
+    
+    try:
+        op.rename_table('video_new', 'video')
+    except Exception as e:
+        print(f"Note: Could not rename video_new to video: {e}")
+    
+    try:
+        op.rename_table('video_tags_new', 'video_tags')
+    except Exception as e:
+        print(f"Note: Could not rename video_tags_new to video_tags: {e}")
 
 
 def downgrade():
-    # Drop the new tables
-    op.drop_table('video_tags')
-    op.drop_table('video')
-    op.drop_table('folder')
-    op.drop_table('game')
+    # Drop the new tables with error handling
+    try:
+        op.drop_table('video_tags')
+    except Exception as e:
+        print(f"Note: Could not drop video_tags table: {e}")
+    
+    try:
+        op.drop_table('video')
+    except Exception as e:
+        print(f"Note: Could not drop video table: {e}")
+    
+    try:
+        op.drop_table('folder')
+    except Exception as e:
+        print(f"Note: Could not drop folder table: {e}")
+    
+    try:
+        op.drop_table('game')
+    except Exception as e:
+        print(f"Note: Could not drop game table: {e}")
     
     # Recreate original tables
     op.create_table('folder',
