@@ -56,7 +56,7 @@ const TagInput = ({ initialTags = [], onChange, label = "Tags", sx = {} }) => {
     return () => {
       active = false;
     };
-  }, [inputValue]);
+  }, [inputValue, selectedTags]);
 
   // When tags change, notify parent
   useEffect(() => {

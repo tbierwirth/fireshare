@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Grid, Stack, Typography, TextField, Button, Box, Link } from '@mui/material'
+import { Grid, Stack, Typography, TextField, Button, Box } from '@mui/material'
 import PropTypes from 'prop-types'
 
 import { AuthService } from '../../services'
@@ -63,7 +63,7 @@ const RegisterForm = function ({ sx }) {
     }
 
     try {
-      const response = await AuthService.register(username, password, email, inviteCode)
+      await AuthService.register(username, password, email, inviteCode)
       navigate('/')
     } catch (err) {
       const { status, data } = err.response

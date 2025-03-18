@@ -29,7 +29,7 @@ import SnackbarAlert from '../alert/SnackbarAlert';
 
 const InviteManager = () => {
   const [invites, setInvites] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [email, setEmail] = useState('');
   const [expiresDays, setExpiresDays] = useState(7);
