@@ -124,12 +124,22 @@ class Game(db.Model):
         return game
     
     def json(self):
+        # Handle video_count safely with SQLAlchemy query count
+        video_count = 0
+        if hasattr(self, 'videos'):
+            if hasattr(self.videos, 'count'):
+                # If videos is a query object, use count() method
+                video_count = self.videos.count()
+            elif isinstance(self.videos, list):
+                # If videos is already loaded as a list
+                video_count = len(self.videos)
+        
         return {
             "id": self.id,
             "name": self.name,
             "slug": self.slug,
             "folder_id": self.folder.id if self.folder else None,
-            "video_count": len(self.videos) if self.videos else 0
+            "video_count": video_count
         }
 
 class Tag(db.Model):
@@ -163,11 +173,21 @@ class Tag(db.Model):
         return tag
     
     def json(self):
+        # Handle video_count safely with SQLAlchemy query count
+        video_count = 0
+        if hasattr(self, 'videos'):
+            if hasattr(self.videos, 'count'):
+                # If videos is a query object, use count() method
+                video_count = self.videos.count()
+            elif isinstance(self.videos, list):
+                # If videos is already loaded as a list
+                video_count = len(self.videos)
+        
         return {
             "id": self.id,
             "name": self.name,
             "slug": self.slug,
-            "video_count": len(self.videos) if hasattr(self, 'videos') else 0
+            "video_count": video_count
         }
 
 class Folder(db.Model):

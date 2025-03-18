@@ -124,7 +124,7 @@ const GameSelector = ({ initialGame = '', onChange, sx = {} }) => {
           {...params}
           label="Game (Required)"
           variant="outlined"
-          placeholder="Click to see all games or type to search"
+          placeholder="Game name (e.g., Minecraft, Fortnite)"
           error={!selectedGame}
           helperText={!selectedGame ? "Game is required" : ""}
           InputProps={{
