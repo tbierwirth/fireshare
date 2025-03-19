@@ -45,6 +45,38 @@ export const useDebounce = (value, delay) => {
   return debouncedValue
 }
 
+// Enhanced cache utility
+export const cache = {
+  get: (key) => {
+    const data = localStorage.getItem(key);
+    if (!data) return null;
+    
+    try {
+      const { value, expiry } = JSON.parse(data);
+      if (expiry && expiry < Date.now()) {
+        localStorage.removeItem(key);
+        return null;
+      }
+      return value;
+    } catch (err) {
+      console.error('Cache retrieval error:', err);
+      return null;
+    }
+  },
+  
+  set: (key, value, ttl = 5 * 60 * 1000) => {
+    try {
+      const data = {
+        value,
+        expiry: ttl ? Date.now() + ttl : null
+      };
+      localStorage.setItem(key, JSON.stringify(data));
+    } catch (err) {
+      console.error('Cache set error:', err);
+    }
+  }
+};
+
 export const getSettings = () => localStorage.getItem('config') && JSON.parse(localStorage.getItem('config'))
 export const getSetting = (setting) =>
   localStorage.getItem('config') && JSON.parse(localStorage.getItem('config'))[setting]

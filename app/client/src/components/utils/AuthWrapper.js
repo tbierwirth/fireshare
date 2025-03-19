@@ -1,28 +1,29 @@
 import React from 'react'
 import { Navigate } from 'react-router-dom'
-import { AuthService } from '../../services'
+import { useAuth } from '../../contexts/AuthContext'
+import { Box, CircularProgress } from '@mui/material'
 
 const AuthWrapper = ({ children, redirect }) => {
-  const [authed, setAuthed] = React.useState(true)
-  const [checkingAuth, setCheckingAuth] = React.useState(true)
-  React.useEffect(() => {
-    async function isLoggedIn() {
-      try {
-        const authed = (await AuthService.isLoggedIn()).data
-        setAuthed(authed)
-      } catch (err) {
-        setAuthed(false)
-        console.error(err)
-      }
-      setCheckingAuth(false)
-    }
-    isLoggedIn()
-  }, [])
+  const { isLoggedIn, isLoading } = useAuth();
+  
+  // Show minimal loading indicator while checking auth
+  if (isLoading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <CircularProgress size={24} />
+      </Box>
+    );
+  }
 
-  if (checkingAuth) return <div></div>
-
-  if (!redirect) return React.cloneElement(children, { authenticated: authed })
-  else return authed ? React.cloneElement(children, { authenticated: authed }) : <Navigate to={redirect} />
+  // No redirect specified, just pass auth status to child
+  if (!redirect) {
+    return React.cloneElement(children, { authenticated: isLoggedIn });
+  }
+  
+  // Redirect if not authenticated
+  return isLoggedIn 
+    ? React.cloneElement(children, { authenticated: isLoggedIn }) 
+    : <Navigate to={redirect} />;
 }
 
 export default AuthWrapper

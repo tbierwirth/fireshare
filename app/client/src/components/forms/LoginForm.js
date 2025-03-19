@@ -1,38 +1,39 @@
-import React from 'react'
+import React, { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-
 import { Grid, Stack, Typography, TextField, Button, Box } from '@mui/material'
-
 import PropTypes from 'prop-types'
-
-import { AuthService } from '../../services'
 import SnackbarAlert from '../alert/SnackbarAlert'
-
 import logo from '../../assets/logo.png'
+import { useAuth } from '../../contexts/AuthContext'
 
 const LoginForm = function ({ sx }) {
-  const [username, setUsername] = React.useState(null)
-  const [password, setPassword] = React.useState(null)
-  const [alert, setAlert] = React.useState({ open: false })
+  const [username, setUsername] = useState(null)
+  const [password, setPassword] = useState(null)
+  const [alert, setAlert] = useState({ open: false })
+  const [isLoading, setIsLoading] = useState(false)
   const navigate = useNavigate()
+  const { login } = useAuth()
 
-  async function login() {
+  const handleLogin = useCallback(async () => {
     if (!username || !password) {
       setAlert({
         type: 'error',
         message: 'A Username & Password are required.',
         open: true,
       })
+      return
     }
+    
+    setIsLoading(true)
     try {
-      await AuthService.login(username, password)
+      await login(username, password)
       navigate('/')
     } catch (err) {
-      const { status } = err.response
+      const { status } = err.response || {}
       if (status === 401) {
         setAlert({
           type: 'warning',
-          message: err.response.data,
+          message: err.response?.data || 'Invalid credentials',
           open: true,
         })
       } else {
@@ -42,29 +43,40 @@ const LoginForm = function ({ sx }) {
           open: true,
         })
       }
+    } finally {
+      setIsLoading(false)
     }
-  }
+  }, [username, password, login, navigate])
 
-  const handleLogin = (ev) => {
-    if (ev.type === 'keypress') {
-      if (ev.key === 'Enter' && password) {
-        ev.preventDefault()
-        login()
-      }
-    } else {
+  const handleKeyPress = useCallback((ev) => {
+    if (ev.key === 'Enter' && password && username) {
       ev.preventDefault()
-      login()
+      handleLogin()
     }
-  }
+  }, [handleLogin, password, username])
 
-  const handleLoginChange = (e) => {
+  const handleButtonClick = useCallback((ev) => {
+    ev.preventDefault()
+    handleLogin()
+  }, [handleLogin])
+
+  const handleLoginChange = useCallback((e) => {
     setAlert({})
     setUsername(e.target.value)
-  }
+  }, [])
+
+  const handlePasswordChange = useCallback((e) => {
+    setAlert({})
+    setPassword(e.target.value)
+  }, [])
 
   return (
     <Grid container direction="column" justifyContent="flex-end" alignItems="center" sx={{ p: 2, ...sx }}>
-      <SnackbarAlert severity={alert.type} open={alert.open} setOpen={(open) => setAlert({ ...alert, open })}>
+      <SnackbarAlert 
+        severity={alert.type} 
+        open={alert.open} 
+        setOpen={(open) => setAlert({ ...alert, open })}
+      >
         {alert.message}
       </SnackbarAlert>
       <Grid item sx={{ mb: 2 }}>
@@ -74,7 +86,6 @@ const LoginForm = function ({ sx }) {
         <Typography
           align="center"
           sx={{
-            // fontFamily: 'monospace',
             fontWeight: 700,
             fontSize: 32,
             letterSpacing: '.2rem',
@@ -105,7 +116,7 @@ const LoginForm = function ({ sx }) {
             label="Username"
             variant="outlined"
             placeholder="Username"
-            onKeyPress={handleLogin}
+            onKeyPress={handleKeyPress}
             onChange={handleLoginChange}
             autoFocus
           />
@@ -118,8 +129,8 @@ const LoginForm = function ({ sx }) {
             variant="outlined"
             type="password"
             placeholder="Password"
-            onKeyPress={handleLogin}
-            onChange={(e) => setPassword(e.target.value)}
+            onKeyPress={handleKeyPress}
+            onChange={handlePasswordChange}
           />
         </Grid>
         <Grid item xs={12} sx={{ mt: 1 }}>
@@ -128,10 +139,10 @@ const LoginForm = function ({ sx }) {
               variant="contained"
               size="large"
               sx={{ width: '100%' }}
-              disabled={!password || !username}
-              onClick={handleLogin}
+              disabled={!password || !username || isLoading}
+              onClick={handleButtonClick}
             >
-              Sign in
+              {isLoading ? 'Signing in...' : 'Sign in'}
             </Button>
             <Button
               variant="text"
