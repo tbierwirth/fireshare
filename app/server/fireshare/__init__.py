@@ -140,9 +140,10 @@ def create_app(init_schedule=False):
     from .auth import auth as auth_blueprint
     app.register_blueprint(auth_blueprint)
 
-    # blueprint for api routes
-    from .api import api as api_blueprint
-    app.register_blueprint(api_blueprint)
+    # Blueprint for API routes
+    # The API has been restructured into a modular organization by resource type
+    from .api import api
+    app.register_blueprint(api)
 
     # blueprint for non-auth parts of app
     from .main import main as main_blueprint
