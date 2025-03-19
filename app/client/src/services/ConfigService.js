@@ -1,8 +1,12 @@
 import Api from './Api'
+import { dedupedFetch } from './Api'
 
 const service = {
   getConfig() {
-    return Api().get('/api/config')
+    return dedupedFetch({
+      method: 'get',
+      url: '/api/config'
+    })
   },
   getAdminConfig() {
     return Api().get('/api/admin/config')

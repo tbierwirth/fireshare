@@ -1,29 +1,39 @@
 import Api from './Api'
+import { dedupedFetch } from './Api'
 
 const service = {
   // Video CRUD operations
   getVideos(sort) {
-    return Api().get('/api/videos', {
-      params: {
-        sort,
-      },
+    return dedupedFetch({
+      method: 'get',
+      url: '/api/videos',
+      params: { sort }
     })
   },
   getPublicVideos(sort) {
-    return Api().get('/api/videos/public', {
-      params: {
-        sort,
-      },
+    return dedupedFetch({
+      method: 'get', 
+      url: '/api/videos/public',
+      params: { sort }
     })
   },
   getDetails(id) {
-    return Api().get(`/api/video/details/${id}`)
+    return dedupedFetch({
+      method: 'get',
+      url: `/api/video/details/${id}`
+    })
   },
   getRandomVideo() {
-    return Api().get('/api/video/random')
+    return dedupedFetch({
+      method: 'get',
+      url: '/api/video/random'
+    })
   },
   getRandomPublicVideo() {
-    return Api().get('/api/video/public/random')
+    return dedupedFetch({
+      method: 'get',
+      url: '/api/video/public/random'
+    })
   },
   getViews(id) {
     return Api().get(`/api/video/${id}/views`)
@@ -89,31 +99,51 @@ const service = {
   
   // Game operations
   getGames() {
-    return Api().get('/api/games')
+    return dedupedFetch({
+      method: 'get',
+      url: '/api/games'
+    })
   },
   searchGames(query) {
-    return Api().get('/api/games/search', {
+    return dedupedFetch({
+      method: 'get',
+      url: '/api/games/search',
       params: { q: query }
     })
   },
   getVideoGame(videoId) {
-    return Api().get(`/api/video/${videoId}/game`)
+    return dedupedFetch({
+      method: 'get',
+      url: `/api/video/${videoId}/game`
+    })
   },
   setVideoGame(videoId, game) {
-    return Api().put(`/api/video/${videoId}/game`, { game })
+    return dedupedFetch({
+      method: 'put',
+      url: `/api/video/${videoId}/game`,
+      data: { game }
+    })
   },
   
   // Tag operations
   getTags() {
-    return Api().get('/api/tags')
+    return dedupedFetch({
+      method: 'get',
+      url: '/api/tags'
+    })
   },
   searchTags(query) {
-    return Api().get('/api/tags/search', {
+    return dedupedFetch({
+      method: 'get',
+      url: '/api/tags/search',
       params: { q: query }
     })
   },
   getVideoTags(videoId) {
-    return Api().get(`/api/video/${videoId}/tags`)
+    return dedupedFetch({
+      method: 'get',
+      url: `/api/video/${videoId}/tags`
+    })
   },
   addVideoTags(videoId, tags) {
     return Api().post(`/api/video/${videoId}/tags`, { tags })
@@ -124,7 +154,10 @@ const service = {
   
   // Folder operations
   getFolders() {
-    return Api().get('/api/folders')
+    return dedupedFetch({
+      method: 'get',
+      url: '/api/folders'
+    })
   },
   updateVideoFolder(videoId, folderId) {
     return Api().put(`/api/video/${videoId}/folder`, { folder_id: folderId })

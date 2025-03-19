@@ -4,216 +4,170 @@ import TextField from '@mui/material/TextField';
 import { CircularProgress } from '@mui/material';
 import VideoService from '../../services/VideoService';
 
-// Debounce function to limit API calls
-const useDebounce = (value, delay) => {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-  
-  useEffect(() => {
-    // Update debounced value after delay
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-    
-    // Cancel the timeout if value changes or unmounts
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, delay]);
-  
-  return debouncedValue;
-};
+// THIS IS A CRITICAL DEBUGGING VERSION OF GAMESELECTOR
+// It has extensive logging to help diagnose UI issues
 
-/**
- * Game selector component with autocomplete
- * @param {Object} props
- * @param {string} props.initialGame - Initial game to display
- * @param {Function} props.onChange - Callback when game changes
- * @param {boolean} props.loading - External loading state, e.g. when initial game is being loaded
- * @param {Object} props.sx - Additional styles
- */
-const GameSelector = ({ initialGame, onChange, loading: externalLoading = false, sx = {} }) => {
-  const [inputValue, setInputValue] = useState(initialGame || '');
-  const [selectedGame, setSelectedGame] = useState(initialGame);
+// Debug counter to track component instances
+let instanceCounter = 0;
+
+const GameSelector = ({ initialGame, onChange, sx = {} }) => {
+  // Create unique instance ID for debugging
+  const instanceId = useRef(`GameSelector-${++instanceCounter}`);
+  console.log(`[${instanceId.current}] RENDER with initialGame:`, initialGame);
+  
+  // Simple local state - no complex interactions
+  const [inputValue, setInputValue] = useState('');
+  const [selectedGame, setSelectedGame] = useState('');
   const [options, setOptions] = useState([]);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [allGames, setAllGames] = useState([]);
-  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
-  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
   
-  // Combine external loading (from parent) with internal search loading
-  const loading = externalLoading || searchLoading;
-
-  // Load all games on component mount
+  // Only load games once
+  const hasLoadedGames = useRef(false);
+  const hasSyncedInitialGame = useRef(false);
+  const mounted = useRef(true);
+  
+  // Use a ref to track render count for debugging
+  const renderCount = useRef(0);
+  renderCount.current++;
+  
+  // Log every render
+  console.log(`[${instanceId.current}] RENDER #${renderCount.current}`, {
+    initialGame,
+    selectedGame,
+    inputValue,
+    optionsCount: options.length,
+    loading,
+    hasLoadedGames: hasLoadedGames.current,
+    hasSyncedInitialGame: hasSyncedInitialGame.current
+  });
+  
+  // Load games once on mount
   useEffect(() => {
-    let isCancelled = false;
+    console.log(`[${instanceId.current}] MOUNT EFFECT running`);
+    mounted.current = true;
     
-    const fetchAllGames = async () => {
-      // If allGames is already populated, don't fetch again
-      if (allGames.length > 0) return;
+    const loadGames = async () => {
+      // Skip if we've already loaded games
+      if (hasLoadedGames.current) {
+        console.log(`[${instanceId.current}] Already loaded games, skipping`);
+        return;
+      }
+      
+      console.log(`[${instanceId.current}] Loading games...`);
+      setLoading(true);
       
       try {
-        console.log('Fetching all games once');
         const response = await VideoService.getGames();
-        if (!isCancelled && response.data && response.data.games) {
-          const gameNames = response.data.games.map(game => game.name);
-          gameNames.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
-          setAllGames(gameNames);
-          setHasLoadedOnce(true);
+        if (!mounted.current) {
+          console.log(`[${instanceId.current}] Component unmounted during games load, aborting`);
+          return;
+        }
+        
+        if (response.data && response.data.games) {
+          const gameNames = response.data.games.map(game => game.name).sort();
+          console.log(`[${instanceId.current}] Loaded ${gameNames.length} games`);
+          
+          setOptions(gameNames);
+          hasLoadedGames.current = true;
         }
       } catch (error) {
-        if (!isCancelled) {
-          console.error('Error fetching all games:', error);
+        console.error(`[${instanceId.current}] Failed to load games:`, error);
+      } finally {
+        if (mounted.current) {
+          setLoading(false);
         }
       }
     };
-
-    fetchAllGames();
+    
+    loadGames();
     
     return () => {
-      isCancelled = true;
+      console.log(`[${instanceId.current}] UNMOUNTING`);
+      mounted.current = false;
     };
-  }, [allGames.length]);
+  }, []);
   
-  // When the initialGame changes (from parent component), update the selectedGame
-  // The useRef prevents the inputValue update from causing an infinite loop
-  const prevInitialGameRef = useRef(initialGame);
-  
+  // Handle initialGame changes - only run this once when games are loaded
   useEffect(() => {
-    // Only proceed if we have a valid initialGame or if it's intentionally empty
-    // This prevents showing empty state during loading
+    if (!mounted.current) {
+      console.log(`[${instanceId.current}] Not mounted, skipping initialGame effect`);
+      return;
+    }
+    
+    console.log(`[${instanceId.current}] INITIAL GAME EFFECT`, {
+      initialGame,
+      hasLoaded: hasLoadedGames.current,
+      hasSynced: hasSyncedInitialGame.current
+    });
+    
+    // Don't sync until we have loaded games (unless initialGame is explicitly empty)
+    if (!hasLoadedGames.current && initialGame !== '') {
+      console.log(`[${instanceId.current}] Games not loaded yet, deferring initialGame sync`);
+      return;
+    }
+    
+    // Only sync once unless initialGame changes
+    if (hasSyncedInitialGame.current && initialGame === selectedGame) {
+      console.log(`[${instanceId.current}] Already synced initialGame, skipping`);
+      return;
+    }
+    
+    console.log(`[${instanceId.current}] Syncing initialGame:`, initialGame);
+    
+    // Set selected game and input value
     if (initialGame !== undefined) {
-      // Set the selectedGame whenever initialGame changes
-      if (initialGame !== selectedGame) {
-        setSelectedGame(initialGame);
-      }
+      console.log(`[${instanceId.current}] Setting selectedGame to:`, initialGame);
+      setSelectedGame(initialGame);
+      setInputValue(initialGame);
       
-      // Only update input if initialGame changed and input doesn't match it yet
-      if (initialGame !== prevInitialGameRef.current) {
-        setInputValue(initialGame || '');
-        prevInitialGameRef.current = initialGame;
-        
-        // If initialGame exists and allGames is loaded, let's optimize by
-        // adding the initialGame to options without an extra search
-        if (initialGame && allGames.length > 0 && !options.includes(initialGame)) {
-          setOptions(prev => [...prev, initialGame]);
-        }
-        
-        console.log("GameSelector initialGame changed:", initialGame);
+      // Make sure the initial game is in options
+      if (initialGame && options.length > 0 && !options.includes(initialGame)) {
+        console.log(`[${instanceId.current}] Adding initialGame to options:`, initialGame);
+        setOptions(prev => [...prev, initialGame]);
       }
-    }
-  }, [initialGame, selectedGame, allGames.length, options]);
-
-  // Debounce the input value to avoid excessive API calls (300ms delay)
-  const debouncedInputValue = useDebounce(inputValue, 300);
-
-  // Load games matching input value or show all games when dropdown is open
-  useEffect(() => {
-    let active = true;
-
-    // If input is empty, handle showing games appropriately
-    if (debouncedInputValue === '') {
-      if (open) {
-        // Show all games when the dropdown is open and input is empty
-        setOptions(allGames);
-      } else {
-        // Show only the selected game when closed
-        setOptions(selectedGame ? [selectedGame] : []);
-      }
-      return undefined;
-    }
-
-    // Try to filter from already loaded games first
-    const filteredFromLoaded = allGames.filter(
-      game => game.toLowerCase().includes(debouncedInputValue.toLowerCase())
-    );
-    
-    // If we have sufficient matches from local data, use those instead of API call
-    if (filteredFromLoaded.length > 0) {
-      console.log('Using locally filtered games for:', debouncedInputValue);
-      setOptions(filteredFromLoaded);
-      return undefined;
     }
     
-    // Otherwise, make a server-side search
-    setSearchLoading(true);
-    console.log('Server-side searching games with debounced value:', debouncedInputValue);
-
-    (async () => {
-      try {
-        const response = await VideoService.searchGames(debouncedInputValue);
-        if (active) {
-          let newOptions = [];
-          
-          if (response.data && response.data.games) {
-            // Convert from API format to component format
-            newOptions = response.data.games.map(game => game.name);
-          }
-          
-          // Ensure we don't show duplicates and preserve the current selection
-          newOptions = [...new Set([
-            ...(selectedGame ? [selectedGame] : []), 
-            ...newOptions
-          ])];
-          
-          setOptions(newOptions);
-          setSearchLoading(false);
-        }
-      } catch (error) {
-        if (active) {
-          console.error('Error fetching games:', error);
-          setSearchLoading(false);
-        }
-      }
-    })();
-
-    return () => {
-      active = false;
-    };
-  }, [debouncedInputValue, selectedGame, open, allGames]);
-
-  // When game changes, notify parent
+    hasSyncedInitialGame.current = true;
+  }, [initialGame, selectedGame, options]);
+  
+  // Notify parent component when selected game changes
   useEffect(() => {
-    if (onChange) {
+    console.log(`[${instanceId.current}] SELECTED GAME EFFECT:`, selectedGame);
+    
+    if (onChange && hasSyncedInitialGame.current && selectedGame !== undefined) {
+      console.log(`[${instanceId.current}] Notifying parent of game change:`, selectedGame);
       onChange(selectedGame);
     }
   }, [selectedGame, onChange]);
-
-  const handleGameChange = (event, newValue) => {
-    // Allow creation of new game
-    setSelectedGame(newValue);
+  
+  // Handle input change (triggered when typing)
+  const handleInputChange = (event, newInputValue) => {
+    console.log(`[${instanceId.current}] Input changed:`, newInputValue);
+    setInputValue(newInputValue);
   };
-
+  
+  // Handle game selection (triggered when selecting from dropdown)
+  const handleGameChange = (event, newValue) => {
+    console.log(`[${instanceId.current}] Game selected:`, newValue);
+    setSelectedGame(newValue || '');
+  };
+  
+  // Render the component
   return (
     <Autocomplete
-      sx={{ ...sx }}
-      open={open}
-      onOpen={() => setOpen(true)}
-      onClose={() => setOpen(false)}
-      options={options}
       value={selectedGame}
       onChange={handleGameChange}
       inputValue={inputValue}
-      onInputChange={(event, newInputValue) => {
-        setInputValue(newInputValue);
-      }}
-      filterOptions={(options, params) => {
-        const filtered = options.filter(option => 
-          option.toLowerCase().includes(params.inputValue.toLowerCase())
-        );
-        
-        // Add "create" option if input doesn't match any option
-        if (params.inputValue !== '' && !filtered.includes(params.inputValue)) {
-          filtered.push(params.inputValue);
-        }
-        
-        return filtered;
-      }}
+      onInputChange={handleInputChange}
+      options={options}
+      loading={loading}
+      sx={{ ...sx }}
       renderInput={(params) => (
         <TextField
           {...params}
           label="Game (Required)"
           variant="outlined"
-          placeholder="Game name (e.g., Minecraft, Fortnite)"
+          placeholder="Game name (e.g., Minecraft)"
           error={!selectedGame}
           helperText={!selectedGame ? "Game is required" : ""}
           InputProps={{
@@ -229,8 +183,20 @@ const GameSelector = ({ initialGame, onChange, loading: externalLoading = false,
       )}
       freeSolo
       selectOnFocus
-      clearOnBlur
       handleHomeEndKeys
+      clearOnBlur
+      filterOptions={(options, params) => {
+        const filtered = options.filter(option => 
+          option.toLowerCase().includes(params.inputValue.toLowerCase())
+        );
+        
+        // Add current input as an option if not empty and not already in list
+        if (params.inputValue && !filtered.includes(params.inputValue)) {
+          filtered.push(params.inputValue);
+        }
+        
+        return filtered;
+      }}
     />
   );
 };

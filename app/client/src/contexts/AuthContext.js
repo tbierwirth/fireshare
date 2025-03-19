@@ -41,6 +41,14 @@ export const AuthProvider = ({ children }) => {
         return;
       }
       
+      // Check if there's already an in-flight request
+      const requestKey = 'request:get:/api/loggedin:{}'; 
+      if (cache.isRequestPending(requestKey)) {
+        console.log('Reusing in-flight auth check request');
+        await cache.getPendingRequest(requestKey);
+        return; // The refreshAuthStatus flow will handle setting the state
+      }
+      
       // No cache or expired, fetch from API
       refreshAuthStatus();
     } catch (error) {
@@ -54,14 +62,40 @@ export const AuthProvider = ({ children }) => {
   // Refresh auth status from the server
   const refreshAuthStatus = async () => {
     try {
-      const authRes = await AuthService.isLoggedIn();
+      // Create request keys for deduplication
+      const loginRequestKey = 'request:get:/api/loggedin:{}';
+      
+      // Use cache.registerRequest to dedupe the request
+      let authPromise;
+      if (cache.isRequestPending(loginRequestKey)) {
+        console.log('Using existing auth check request');
+        authPromise = cache.getPendingRequest(loginRequestKey);
+      } else {
+        console.log('Creating new auth check request');
+        authPromise = AuthService.isLoggedIn();
+        cache.registerRequest(loginRequestKey, authPromise);
+      }
+      
+      const authRes = await authPromise;
       const isAuthenticated = authRes.data;
       setIsLoggedIn(isAuthenticated);
       
       // If logged in, get user profile
       if (isAuthenticated) {
         try {
-          const profileRes = await AuthService.getProfile();
+          const profileRequestKey = 'request:get:/api/profile:{}';
+          
+          let profilePromise;
+          if (cache.isRequestPending(profileRequestKey)) {
+            console.log('Using existing profile request');
+            profilePromise = cache.getPendingRequest(profileRequestKey);
+          } else {
+            console.log('Creating new profile request');
+            profilePromise = AuthService.getProfile();
+            cache.registerRequest(profileRequestKey, profilePromise);
+          }
+          
+          const profileRes = await profilePromise;
           setUser(profileRes.data);
         } catch (err) {
           console.error('Error fetching user profile:', err);

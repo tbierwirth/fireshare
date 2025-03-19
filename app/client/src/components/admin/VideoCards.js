@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react'
+import React, { useCallback, useEffect, useState, useRef } from 'react'
 import { Box, Button, Grid, Paper, Typography } from '@mui/material'
 import SnackbarAlert from '../alert/SnackbarAlert'
 import VisibilityCard from './VisibilityCard'
@@ -8,7 +8,16 @@ import { VideoService } from '../../services'
 import UploadCard from './UploadCard'
 // eslint-disable-next-line no-unused-vars
 import { TagDisplay } from '../tags'
+import { VideoListSkeleton } from '../utils/SkeletonLoader'
+import { useLoadingState, useOptimisticUI } from '../../hooks'
 
+// Session storage key to track if this component has shown videos before
+const SESSION_KEY_VIDEO_CARDS = 'component:videoCards:hasShownVideos'
+
+/**
+ * Enhanced VideoCards component with improved loading state management
+ * using custom hooks for smoother transitions
+ */
 const VideoCards = ({
   videos,
   loadingIcon = null,
@@ -18,20 +27,42 @@ const VideoCards = ({
   authenticated,
   size,
 }) => {
-  const [vids, setVideos] = React.useState(videos)
-  const [alert, setAlert] = React.useState({ open: false })
-  const [videoModal, setVideoModal] = React.useState({
+  // Track local state
+  const [vids, setVideos] = useState(videos || []);
+  const [alert, setAlert] = useState({ open: false });
+  const [videoModal, setVideoModal] = useState({
     open: false,
-  })
-
-  const previousVideosRef = React.useRef()
-  const previousVideos = previousVideosRef.current
-  if (videos !== previousVideos && videos !== vids) {
-    setVideos(videos)
-  }
-  React.useEffect(() => {
-    previousVideosRef.current = videos
-  })
+  });
+  
+  // Use our custom loading state hook (manages minimum duration and debouncing)
+  const [isLoading, setIsLoading, isFirstLoad] = useLoadingState({
+    minDuration: 800,
+    initialState: true,
+    debounceToggles: true
+  });
+  
+  // Use our optimistic UI hook to track if videos have been shown before
+  const hadVideos = useOptimisticUI({
+    key: SESSION_KEY_VIDEO_CARDS,
+    data: videos,
+    condition: (data) => Array.isArray(data) && data.length > 0
+  });
+  
+  // Update videos when the prop changes
+  useEffect(() => {
+    // Update local state without transitions
+    setVideos(videos || []);
+    
+    // Signal that loading is complete after receiving videos
+    if (isLoading && videos) {
+      // Small delay to ensure smooth transition
+      const timer = setTimeout(() => {
+        setIsLoading(false);
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [videos, isLoading, setIsLoading]);
 
   const openVideo = (id) => {
     setVideoModal({
@@ -145,31 +176,60 @@ const VideoCards = ({
         {alert.message}
       </SnackbarAlert>
 
-      {(!vids || vids.length === 0) && EMPTY_STATE()}
-      {vids && vids.length !== 0 && (
-        <Grid container justifyContent="center">
-          {showUploadCard && (
-            <UploadCard
-              authenticated={authenticated}
-              feedView={feedView}
-              cardWidth={size}
-              handleAlert={memoizedHandleAlert}
-              fetchVideos={fetchVideos}
-              publicUpload={feedView}
-            />
+      {/* Always show skeletons during loading */}
+      {isLoading && (
+        <Box>
+          <VideoListSkeleton 
+            count={6} 
+            columns={3}
+          />
+        </Box>
+      )}
+      
+      {/* After loading is complete, show appropriate content */}
+      {!isLoading && (
+        <>
+          {/* Show videos if available */}
+          {vids && vids.length > 0 ? (
+            <Grid container justifyContent="center">
+              {showUploadCard && (
+                <UploadCard
+                  authenticated={authenticated}
+                  feedView={feedView}
+                  cardWidth={size}
+                  handleAlert={memoizedHandleAlert}
+                  fetchVideos={fetchVideos}
+                  publicUpload={feedView}
+                />
+              )}
+              {vids.map((v, index) => (
+                <Box
+                  key={v.path + v.video_id}
+                  sx={{ 
+                    opacity: 0,
+                    animation: `fadeIn 0.5s ease-in-out forwards ${index * 0.1}s`,
+                    '@keyframes fadeIn': {
+                      '0%': { opacity: 0, transform: 'translateY(10px)' },
+                      '100%': { opacity: 1, transform: 'translateY(0)' }
+                    }
+                  }}
+                >
+                  <VisibilityCard
+                    video={v}
+                    handleAlert={memoizedHandleAlert}
+                    openVideo={openVideo}
+                    cardWidth={size}
+                    authenticated={authenticated}
+                    deleted={handleDelete}
+                  />
+                </Box>
+              ))}
+            </Grid>
+          ) : (
+            /* Show empty state if no videos available */
+            EMPTY_STATE()
           )}
-          {vids.map((v) => (
-            <VisibilityCard
-              key={v.path + v.video_id}
-              video={v}
-              handleAlert={memoizedHandleAlert}
-              openVideo={openVideo}
-              cardWidth={size}
-              authenticated={authenticated}
-              deleted={handleDelete}
-            />
-          ))}
-        </Grid>
+        </>
       )}
     </Box>
   )

@@ -2,6 +2,7 @@ import React from 'react'
 import { Route, HashRouter as Router, Routes } from 'react-router-dom'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
 import { CssBaseline } from '@mui/material'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import Login from './views/Login'
 import Register from './views/Register'
 import Watch from './views/Watch'
@@ -17,18 +18,30 @@ import AuthWrapper from './components/utils/AuthWrapper'
 import Navbar20 from './components/nav/Navbar20'
 import { AuthProvider, ConfigProvider, VideoProvider } from './contexts'
 
+// Create a client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+
 const muitheme = createTheme(darkTheme)
 
 export default function App() {
   const drawerOpen = getSetting('drawerOpen') === undefined ? true : getSetting('drawerOpen')
 
   return (
-    <AuthProvider>
-      <ConfigProvider>
-        <VideoProvider>
-          <Router>
-            <ThemeProvider theme={muitheme}>
-              <CssBaseline />
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <ConfigProvider>
+          <VideoProvider>
+            <Router>
+              <ThemeProvider theme={muitheme}>
+                <CssBaseline />
               <Routes>
                 <Route
                   path="/"
@@ -122,5 +135,6 @@ export default function App() {
         </VideoProvider>
       </ConfigProvider>
     </AuthProvider>
+    </QueryClientProvider>
   )
 }

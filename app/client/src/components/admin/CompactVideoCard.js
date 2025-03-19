@@ -16,7 +16,16 @@ const URL = getUrl()
 const PURL = getPublicWatchUrl()
 const SERVED_BY = getServedBy()
 
-const CompactVideoCard = ({ video, openVideoHandler, alertHandler, cardWidth, authenticated, deleted }) => {
+const CompactVideoCard = ({ 
+  video, 
+  openVideoHandler, 
+  alertHandler, 
+  cardWidth, 
+  authenticated, 
+  deleted,
+  onVideoLoaded = () => {}, // Callback when video poster image loads
+  onVideoError = () => {}   // Callback when video poster fails to load
+}) => {
   const [intVideo, setIntVideo] = React.useState(video)
   const [videoId, setVideoId] = React.useState(video.video_id)
   const [title, setTitle] = React.useState(video.info?.title)
@@ -257,6 +266,8 @@ const CompactVideoCard = ({ video, openVideoHandler, alertHandler, cardWidth, au
                 borderTop: 'none',
                 background: 'repeating-linear-gradient(45deg,#606dbc,#606dbc 10px,#465298 10px,#465298 20px)',
               }}
+              onLoad={onVideoLoaded}
+              onError={onVideoError}
             />
 
             {hover && (

@@ -1,4 +1,5 @@
 import Api from './Api'
+import { dedupedFetch } from './Api'
 
 class AuthService {
   login(username, password) {
@@ -13,7 +14,10 @@ class AuthService {
   }
   
   isLoggedIn() {
-    return Api().get('/api/loggedin')
+    return dedupedFetch({
+      method: 'get',
+      url: '/api/loggedin'
+    })
   }
   
   register(username, password, email, inviteCode) {
@@ -26,7 +30,10 @@ class AuthService {
   }
   
   getProfile() {
-    return Api().get('/api/profile')
+    return dedupedFetch({
+      method: 'get',
+      url: '/api/profile'
+    })
   }
   
   updateProfile(updateData) {
