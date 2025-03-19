@@ -31,12 +31,13 @@ const useDebounce = (value, delay) => {
  * @param {boolean} props.loading - External loading state, e.g. when initial game is being loaded
  * @param {Object} props.sx - Additional styles
  */
-const GameSelector = ({ initialGame = '', onChange, loading: externalLoading = false, sx = {} }) => {
-  const [inputValue, setInputValue] = useState('');
+const GameSelector = ({ initialGame, onChange, loading: externalLoading = false, sx = {} }) => {
+  const [inputValue, setInputValue] = useState(initialGame || '');
   const [selectedGame, setSelectedGame] = useState(initialGame);
   const [options, setOptions] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [allGames, setAllGames] = useState([]);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [open, setOpen] = useState(false);
   
   // Combine external loading (from parent) with internal search loading
@@ -44,38 +45,63 @@ const GameSelector = ({ initialGame = '', onChange, loading: externalLoading = f
 
   // Load all games on component mount
   useEffect(() => {
+    let isCancelled = false;
+    
     const fetchAllGames = async () => {
+      // If allGames is already populated, don't fetch again
+      if (allGames.length > 0) return;
+      
       try {
+        console.log('Fetching all games once');
         const response = await VideoService.getGames();
-        if (response.data && response.data.games) {
+        if (!isCancelled && response.data && response.data.games) {
           const gameNames = response.data.games.map(game => game.name);
           gameNames.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
           setAllGames(gameNames);
+          setHasLoadedOnce(true);
         }
       } catch (error) {
-        console.error('Error fetching all games:', error);
+        if (!isCancelled) {
+          console.error('Error fetching all games:', error);
+        }
       }
     };
 
     fetchAllGames();
-  }, []);
+    
+    return () => {
+      isCancelled = true;
+    };
+  }, [allGames.length]);
   
   // When the initialGame changes (from parent component), update the selectedGame
   // The useRef prevents the inputValue update from causing an infinite loop
   const prevInitialGameRef = useRef(initialGame);
   
   useEffect(() => {
-    // Set the selectedGame whenever initialGame changes
-    setSelectedGame(initialGame);
-    
-    // Only update input if initialGame changed and input doesn't match it yet
-    if (initialGame !== prevInitialGameRef.current) {
-      setInputValue(initialGame || '');
-      prevInitialGameRef.current = initialGame;
+    // Only proceed if we have a valid initialGame or if it's intentionally empty
+    // This prevents showing empty state during loading
+    if (initialGame !== undefined) {
+      // Set the selectedGame whenever initialGame changes
+      if (initialGame !== selectedGame) {
+        setSelectedGame(initialGame);
+      }
+      
+      // Only update input if initialGame changed and input doesn't match it yet
+      if (initialGame !== prevInitialGameRef.current) {
+        setInputValue(initialGame || '');
+        prevInitialGameRef.current = initialGame;
+        
+        // If initialGame exists and allGames is loaded, let's optimize by
+        // adding the initialGame to options without an extra search
+        if (initialGame && allGames.length > 0 && !options.includes(initialGame)) {
+          setOptions(prev => [...prev, initialGame]);
+        }
+        
+        console.log("GameSelector initialGame changed:", initialGame);
+      }
     }
-    
-    console.log("GameSelector initialGame changed:", initialGame);
-  }, [initialGame]);
+  }, [initialGame, selectedGame, allGames.length, options]);
 
   // Debounce the input value to avoid excessive API calls (300ms delay)
   const debouncedInputValue = useDebounce(inputValue, 300);
@@ -84,6 +110,7 @@ const GameSelector = ({ initialGame = '', onChange, loading: externalLoading = f
   useEffect(() => {
     let active = true;
 
+    // If input is empty, handle showing games appropriately
     if (debouncedInputValue === '') {
       if (open) {
         // Show all games when the dropdown is open and input is empty
@@ -95,8 +122,21 @@ const GameSelector = ({ initialGame = '', onChange, loading: externalLoading = f
       return undefined;
     }
 
+    // Try to filter from already loaded games first
+    const filteredFromLoaded = allGames.filter(
+      game => game.toLowerCase().includes(debouncedInputValue.toLowerCase())
+    );
+    
+    // If we have sufficient matches from local data, use those instead of API call
+    if (filteredFromLoaded.length > 0) {
+      console.log('Using locally filtered games for:', debouncedInputValue);
+      setOptions(filteredFromLoaded);
+      return undefined;
+    }
+    
+    // Otherwise, make a server-side search
     setSearchLoading(true);
-    console.log('Searching games with debounced value:', debouncedInputValue);
+    console.log('Server-side searching games with debounced value:', debouncedInputValue);
 
     (async () => {
       try {
@@ -109,15 +149,20 @@ const GameSelector = ({ initialGame = '', onChange, loading: externalLoading = f
             newOptions = response.data.games.map(game => game.name);
           }
           
-          // Ensure we don't show duplicates
-          newOptions = [...new Set([...newOptions])];
+          // Ensure we don't show duplicates and preserve the current selection
+          newOptions = [...new Set([
+            ...(selectedGame ? [selectedGame] : []), 
+            ...newOptions
+          ])];
           
           setOptions(newOptions);
           setSearchLoading(false);
         }
       } catch (error) {
-        console.error('Error fetching games:', error);
-        setSearchLoading(false);
+        if (active) {
+          console.error('Error fetching games:', error);
+          setSearchLoading(false);
+        }
       }
     })();
 

@@ -69,6 +69,36 @@ def search_games():
         
     return jsonify({"games": games_with_count})
 
+# Additional endpoints that will be registered directly with the main blueprint
+def register_direct_routes(app_or_blueprint):
+    """Register routes that aren't part of the /api/games URL structure"""
+    
+    @app_or_blueprint.route('/api/video/<video_id>/game', methods=['GET', 'PUT'])
+    def handle_video_game(video_id):
+        """Get or set a video's game"""
+        # SQLAlchemy 2.0 query pattern
+        stmt = select(Video).filter_by(video_id=video_id)
+        video = db.session.execute(stmt).scalar_one_or_none()
+        
+        if not video:
+            return jsonify({"error": "Video not found"}), 404
+            
+        if request.method == 'GET':
+            return jsonify({"game": video.game.name if video.game else None})
+            
+        if request.method == 'PUT':
+            if not current_user.is_authenticated:
+                return jsonify({"error": "Authentication required"}), 401
+                
+            game_name = request.json.get('game')
+            if not game_name:
+                return jsonify({"error": "No game provided"}), 400
+                
+            game = video.set_game(game_name)
+            return jsonify({"game": game.name}), 200
+
 # Register this module with the main API blueprint
 def register_routes(app_or_blueprint):
     app_or_blueprint.register_blueprint(games_bp)
+    # Also register non-prefixed routes
+    register_direct_routes(app_or_blueprint)

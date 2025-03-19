@@ -4,7 +4,7 @@ import Button from '@mui/material/Button'
 import Modal from '@mui/material/Modal'
 import CancelIcon from '@mui/icons-material/Cancel'
 import DeleteIcon from '@mui/icons-material/Delete'
-import { ButtonGroup, Stack, TextField, Typography, Divider } from '@mui/material'
+import { ButtonGroup, Stack, TextField, Typography, Divider, CircularProgress } from '@mui/material'
 import { VideoService } from '../../services'
 import LightTooltip from '../misc/LightTooltip'
 import { TagInput, GameSelector } from '../tags'
@@ -27,7 +27,8 @@ const style = {
 const UpdateDetailsModal = ({ open, close, videoId, currentTitle, currentDescription, alertHandler }) => {
   const [title, setTitle] = React.useState(currentTitle)
   const [description, setDescription] = React.useState(currentDescription)
-  const [game, setGame] = React.useState('')
+  // Use undefined for game during loading to prevent UI flash
+  const [game, setGame] = React.useState(undefined)
   const [tags, setTags] = React.useState([])
   const [confirmDelete, setConfirmDelete] = React.useState(false)
   const [loading, setLoading] = React.useState(false)
@@ -35,54 +36,64 @@ const UpdateDetailsModal = ({ open, close, videoId, currentTitle, currentDescrip
   
   // Load video game and tags when modal opens
   React.useEffect(() => {
+    // Create a flag to track whether the component is still mounted
+    let isMounted = true;
+    
     if (open && videoId) {
-      setLoading(true)
-      setGameLoading(true) // Set game loading state
-      console.log("Loading video details for videoId:", videoId)
+      // Reset state and set loading states
+      setLoading(true);
+      setGameLoading(true);
+      setGame(undefined); // Use undefined to prevent UI flashing
+      console.log("Loading video details for videoId:", videoId);
       
-      // Load the game
-      VideoService.getVideoGame(videoId)
-        .then(response => {
-          console.log("Game API response:", response.data)
-          if (response.data && response.data.game) {
-            console.log("Setting game to:", response.data.game)
-            setGame(response.data.game)
-          } else {
-            // Reset game if none is set
-            console.log("No game found for video, resetting")
-            setGame('')
-          }
-        })
-        .catch(error => {
-          console.error('Error loading game:', error)
-        })
-        .finally(() => {
-          setGameLoading(false) // Clear game loading state
-        })
-      
-      // Load the tags
-      VideoService.getVideoTags(videoId)
-        .then(response => {
-          console.log("Tags API response:", response.data)
-          if (response.data && response.data.tags) {
-            setTags(response.data.tags.map(tag => tag.name))
-          } else {
-            // Reset tags if none are set
-            setTags([])
-          }
-        })
-        .catch(error => {
-          console.error('Error loading tags:', error)
-        })
-        .finally(() => {
-          setLoading(false)
-        })
+      // Use Promise.all to load game and tags in parallel
+      Promise.all([
+        // Load the game
+        VideoService.getVideoGame(videoId)
+          .then(response => {
+            console.log("Game API response:", response.data);
+            return response.data && response.data.game ? response.data.game : '';
+          })
+          .catch(error => {
+            console.error('Error loading game:', error);
+            return ''; // Default to empty string on error
+          }),
+          
+        // Load the tags
+        VideoService.getVideoTags(videoId)
+          .then(response => {
+            console.log("Tags API response:", response.data);
+            return response.data && response.data.tags 
+              ? response.data.tags.map(tag => tag.name) 
+              : [];
+          })
+          .catch(error => {
+            console.error('Error loading tags:', error);
+            return []; // Default to empty array on error
+          })
+      ])
+      .then(([gameValue, tagsValue]) => {
+        // Only update state if component is still mounted
+        if (isMounted) {
+          console.log("Setting game to:", gameValue);
+          setGame(gameValue);
+          setTags(tagsValue);
+          setGameLoading(false);
+          setLoading(false);
+        }
+      });
     } else if (!open) {
       // Reset when modal closes
-      setGame('')
-      setTags([])
-      setGameLoading(false)
+      setGame(undefined); // Reset to undefined instead of empty string
+      setTags([]);
+      setGameLoading(false);
+      setLoading(false);
     }
+    
+    // Clean up function to prevent state updates after unmount
+    return () => {
+      isMounted = false;
+    };
   }, [open, videoId])
 
   const onTitleChange = (e) => setTitle(e.target.value)
@@ -94,6 +105,16 @@ const UpdateDetailsModal = ({ open, close, videoId, currentTitle, currentDescrip
   }
 
   const handleSave = async () => {
+    // Don't allow saving if still loading game information
+    if (game === undefined || gameLoading) {
+      alertHandler({
+        open: true,
+        type: 'error',
+        message: 'Please wait for game information to load before saving',
+      });
+      return;
+    }
+    
     // First update video details
     const update = {
       title: title || currentTitle,
@@ -189,12 +210,21 @@ const UpdateDetailsModal = ({ open, close, videoId, currentTitle, currentDescrip
             Game
           </Typography>
           
-          <GameSelector 
-            initialGame={game}
-            onChange={setGame}
-            loading={gameLoading}
-            sx={{ width: '100%', mb: 2 }}
-          />
+          {gameLoading ? (
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', p: 2, border: 1, borderColor: 'divider', borderRadius: 1 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mr: 1 }}>
+                Loading game information...
+              </Typography>
+              <CircularProgress size={20} />
+            </Box>
+          ) : (
+            <GameSelector 
+              initialGame={game}
+              onChange={setGame}
+              loading={gameLoading}
+              sx={{ width: '100%', mb: 2 }}
+            />
+          )}
           
           <Typography variant="caption" color="text.secondary">
             The game this video is from. This will determine which folder the video appears in.
@@ -219,7 +249,7 @@ const UpdateDetailsModal = ({ open, close, videoId, currentTitle, currentDescrip
           <Button 
             variant="contained" 
             onClick={handleSave}
-            disabled={!game}
+            disabled={game === ''}
             sx={{ mt: 2 }}
           >
             Save Changes

@@ -142,8 +142,8 @@ def create_app(init_schedule=False):
 
     # Blueprint for API routes
     # The API has been restructured into a modular organization by resource type
-    from .api import api
-    app.register_blueprint(api)
+    from .api import api as api_blueprint
+    app.register_blueprint(api_blueprint)
 
     # blueprint for non-auth parts of app
     from .main import main as main_blueprint
