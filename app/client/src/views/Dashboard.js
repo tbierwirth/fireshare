@@ -1,12 +1,12 @@
-import React from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { Box, Grid, Stack } from '@mui/material'
 import VideoCards from '../components/admin/VideoCards'
 import VideoList from '../components/admin/VideoList'
-import { VideoService } from '../services'
 import LoadingSpinner from '../components/misc/LoadingSpinner'
 import { getSetting, setSetting } from '../common/utils'
 import Select from 'react-select'
 import SnackbarAlert from '../components/alert/SnackbarAlert'
+import { useVideos } from '../contexts'
 
 import selectFolderTheme from '../common/reactSelectFolderTheme'
 import selectSortTheme from '../common/reactSelectSortTheme'
@@ -17,89 +17,109 @@ const createSelectFolders = (folders) => {
 }
 
 const Dashboard = ({ authenticated, searchText, cardSize, listStyle }) => {
-  const [videos, setVideos] = React.useState([])
-  const [search, setSearch] = React.useState(searchText)
-  const [filteredVideos, setFilteredVideos] = React.useState([])
-  const [loading, setLoading] = React.useState(true)
-  const [folders, setFolders] = React.useState(['All Videos'])
-  const [selectedFolder, setSelectedFolder] = React.useState(
+  // Use video context instead of direct API calls
+  const { videos: contextVideos, isLoading, error, getVideos } = useVideos();
+  
+  // Local state
+  const [videos, setVideos] = useState([])
+  const [search, setSearch] = useState(searchText)
+  const [filteredVideos, setFilteredVideos] = useState([])
+  const [folders, setFolders] = useState(['All Videos'])
+  const [selectedFolder, setSelectedFolder] = useState(
     getSetting('folder') || { value: 'All Videos', label: 'All Videos' },
   )
-  const [selectedSort, setSelectedSort] = React.useState(getSetting('sortOption') || SORT_OPTIONS[0])
+  const [selectedSort, setSelectedSort] = useState(getSetting('sortOption') || SORT_OPTIONS[0])
+  const [alert, setAlert] = useState({ open: false })
+  const [prevCardSize, setPrevCardSize] = useState(cardSize)
+  const [prevListStyle, setPrevListStyle] = useState(listStyle)
 
-  const [alert, setAlert] = React.useState({ open: false })
+  // Handle search text changes
+  useEffect(() => {
+    if (searchText !== search) {
+      setSearch(searchText)
+      setFilteredVideos(videos.filter((v) => v.info.title.search(new RegExp(searchText, 'i')) >= 0))
+    }
+  }, [searchText, search, videos])
 
-  const [prevCardSize, setPrevCardSize] = React.useState(cardSize)
-  const [prevListStyle, setPrevListStyle] = React.useState(listStyle)
+  // Handle card size changes
+  useEffect(() => {
+    if (cardSize !== prevCardSize) {
+      setPrevCardSize(cardSize)
+    }
+  }, [cardSize, prevCardSize])
 
-  if (searchText !== search) {
-    setSearch(searchText)
-    setFilteredVideos(videos.filter((v) => v.info.title.search(new RegExp(searchText, 'i')) >= 0))
-  }
-  if (cardSize !== prevCardSize) {
-    setPrevCardSize(cardSize)
-  }
-  if (listStyle !== prevListStyle) {
-    setPrevListStyle(listStyle)
-  }
+  // Handle list style changes
+  useEffect(() => {
+    if (listStyle !== prevListStyle) {
+      setPrevListStyle(listStyle)
+    }
+  }, [listStyle, prevListStyle])
 
-  function fetchVideos() {
-    VideoService.getVideos(selectedSort.value)
-      .then((res) => {
-        setVideos(res.data.videos)
-        setFilteredVideos(res.data.videos)
-        const tfolders = []
-        const gameSet = new Set(); // Use a Set to track unique games
-        
-        // Add traditional folders
-        res.data.videos.forEach((v) => {
-          const split = v.path
-            .split('/')
-            .slice(0, -1)
-            .filter((f) => f !== '')
-          if (split.length > 0 && !tfolders.includes(split[0])) {
-            tfolders.push(split[0])
-          }
-          
-          // Add games as "folders" too
-          if (v.game && !gameSet.has(v.game)) {
-            gameSet.add(v.game)
-          }
-        })
-        
-        // Sort folders alphabetically and add All Videos at the top
-        tfolders.sort((a, b) => (a.toLowerCase() > b.toLowerCase() ? 1 : -1)).unshift('All Videos')
-        
-        // Add Games section to folders (indented with emoji to distinguish)
-        if (gameSet.size > 0) {
-          tfolders.push('--- Games ---')
-          const gameArray = Array.from(gameSet);
-          gameArray.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
-          gameArray.forEach(game => {
-            tfolders.push(`🎮 ${game}`);
-          });
+  // Function to fetch videos using context
+  const fetchVideos = useCallback(() => {
+    getVideos(selectedSort.value, false); // Don't use cache to ensure fresh data
+  }, [getVideos, selectedSort.value]);
+
+  // Process videos when they change in context
+  useEffect(() => {
+    if (contextVideos.length > 0) {
+      setVideos(contextVideos);
+      setFilteredVideos(contextVideos);
+      
+      // Process folders and games
+      const tfolders = [];
+      const gameSet = new Set();
+      
+      // Add traditional folders
+      contextVideos.forEach((v) => {
+        const split = v.path
+          .split('/')
+          .slice(0, -1)
+          .filter((f) => f !== '')
+        if (split.length > 0 && !tfolders.includes(split[0])) {
+          tfolders.push(split[0])
         }
         
-        setFolders(tfolders)
-        setLoading(false)
+        // Add games as "folders" too
+        if (v.game && !gameSet.has(v.game)) {
+          gameSet.add(v.game)
+        }
       })
-      .catch((err) => {
-        setLoading(false)
-        setAlert({
-          open: true,
-          type: 'error',
-          message: err.response?.data || 'Unknown Error',
-        })
-        console.log(err)
-      })
-  }
+      
+      // Sort folders alphabetically and add All Videos at the top
+      tfolders.sort((a, b) => (a.toLowerCase() > b.toLowerCase() ? 1 : -1)).unshift('All Videos')
+      
+      // Add Games section to folders (indented with emoji to distinguish)
+      if (gameSet.size > 0) {
+        tfolders.push('--- Games ---')
+        const gameArray = Array.from(gameSet);
+        gameArray.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+        gameArray.forEach(game => {
+          tfolders.push(`🎮 ${game}`);
+        });
+      }
+      
+      setFolders(tfolders);
+    }
+  }, [contextVideos]);
 
-  React.useEffect(() => {
-    fetchVideos()
-    // eslint-disable-next-line
-  }, [selectedSort])
+  // Handle error display
+  useEffect(() => {
+    if (error) {
+      setAlert({
+        open: true,
+        type: 'error',
+        message: error || 'Unknown Error',
+      });
+    }
+  }, [error]);
 
-  const handleFolderSelection = (folder) => {
+  // Initial fetch when sort changes
+  useEffect(() => {
+    fetchVideos();
+  }, [fetchVideos]);
+
+  const handleFolderSelection = useCallback((folder) => {
     // Skip if separator is clicked
     if (folder.value === '--- Games ---') {
       return;
@@ -107,12 +127,29 @@ const Dashboard = ({ authenticated, searchText, cardSize, listStyle }) => {
     
     setSetting('folder', folder)
     setSelectedFolder(folder)
-  }
+  }, []);
 
-  const handleSortSelection = (sortOption) => {
+  const handleSortSelection = useCallback((sortOption) => {
     setSetting('sortOption', sortOption)
     setSelectedSort(sortOption)
-  }
+  }, []);
+
+  // Memoize filtered videos by folder
+  const displayVideos = useMemo(() => {
+    if (selectedFolder.value === 'All Videos') {
+      return filteredVideos;
+    } else if (selectedFolder.value.startsWith('🎮 ')) {
+      return filteredVideos?.filter((v) => v.game === selectedFolder.value.substring(3));
+    } else {
+      return filteredVideos?.filter((v) => {
+        // Default to path-based filtering
+        return v.path
+            .split('/')
+            .slice(0, -1)
+            .filter((f) => f !== '')[0] === selectedFolder.value;
+      });
+    }
+  }, [selectedFolder, filteredVideos]);
 
   return (
     <>
@@ -150,42 +187,18 @@ const Dashboard = ({ authenticated, searchText, cardSize, listStyle }) => {
               {listStyle === 'list' && (
                 <VideoList
                   authenticated={authenticated}
-                  loadingIcon={loading ? <LoadingSpinner /> : null}
-                  videos={
-                    selectedFolder.value === 'All Videos'
-                      ? filteredVideos
-                      : selectedFolder.value.startsWith('🎮 ')
-                        ? filteredVideos?.filter((v) => v.game === selectedFolder.value.substring(3))
-                        : filteredVideos?.filter((v) => {
-                            // Default to path-based filtering
-                            return v.path
-                                .split('/')
-                                .slice(0, -1)
-                                .filter((f) => f !== '')[0] === selectedFolder.value;
-                          })
-                  }
+                  loadingIcon={isLoading ? <LoadingSpinner /> : null}
+                  videos={displayVideos}
                 />
               )}
               {listStyle === 'card' && (
                 <VideoCards
                   authenticated={authenticated}
-                  loadingIcon={loading ? <LoadingSpinner /> : null}
+                  loadingIcon={isLoading ? <LoadingSpinner /> : null}
                   size={cardSize}
                   showUploadCard={selectedFolder.value === 'All Videos'}
                   fetchVideos={fetchVideos}
-                  videos={
-                    selectedFolder.value === 'All Videos'
-                      ? filteredVideos
-                      : selectedFolder.value.startsWith('🎮 ')
-                        ? filteredVideos?.filter((v) => v.game === selectedFolder.value.substring(3))
-                        : filteredVideos?.filter((v) => {
-                            // Default to path-based filtering
-                            return v.path
-                                .split('/')
-                                .slice(0, -1)
-                                .filter((f) => f !== '')[0] === selectedFolder.value;
-                          })
-                  }
+                  videos={displayVideos}
                 />
               )}
             </Box>
@@ -196,4 +209,4 @@ const Dashboard = ({ authenticated, searchText, cardSize, listStyle }) => {
   )
 }
 
-export default Dashboard
+export default React.memo(Dashboard)

@@ -31,7 +31,7 @@ import { styled } from '@mui/material/styles'
 
 import { Grid, ToggleButton, ToggleButtonGroup } from '@mui/material'
 import { useNavigate } from 'react-router-dom'
-import { AuthService } from '../../services'
+import { useAuth, useConfig } from '../../contexts'
 
 import logo from '../../assets/logo.png'
 import Search from '../search/Search'
@@ -146,21 +146,17 @@ function Navbar20({
   const [alert, setAlert] = React.useState({ open: false })
   const navigate = useNavigate()
   
-  // Check admin status when authenticated
+  // Use auth context
+  const { user, logout } = useAuth();
+  
+  // Set admin status when user changes
   React.useEffect(() => {
-    const checkAdmin = async () => {
-      if (authenticated) {
-        try {
-          const response = await AuthService.isLoggedIn();
-          setIsAdmin(response.data.isAdmin);
-        } catch (error) {
-          console.error("Error checking admin status:", error);
-        }
-      }
-    };
-
-    checkAdmin();
-  }, [authenticated]);
+    if (user) {
+      setIsAdmin(user.is_admin || false);
+    } else {
+      setIsAdmin(false);
+    }
+  }, [user]);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen)
@@ -173,7 +169,7 @@ function Navbar20({
 
   const handleLogout = async () => {
     try {
-      await AuthService.logout()
+      await logout();
       navigate('/login')
     } catch (err) {
       console.error(err)
