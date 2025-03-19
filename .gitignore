@@ -160,3 +160,10 @@ dmypy.json
 .pyre/
 ldap
 dev_scripts/
+
+# Backup files
+*.bak
+requirements.pre_upgrade.txt
+
+# Test data
+test-data/
