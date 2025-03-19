@@ -1,15 +1,18 @@
-import * as React from 'react'
-import Box from '@mui/material/Box'
-import Button from '@mui/material/Button'
-import Modal from '@mui/material/Modal'
-import CancelIcon from '@mui/icons-material/Cancel'
-import DeleteIcon from '@mui/icons-material/Delete'
-import { ButtonGroup, Stack, TextField, Typography, Divider, CircularProgress } from '@mui/material'
-import { VideoService } from '../../services'
-import LightTooltip from '../misc/LightTooltip'
-import { TagInput, GameSelector } from '../tags'
+import * as React from 'react';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Modal from '@mui/material/Modal';
+import CancelIcon from '@mui/icons-material/Cancel';
+import DeleteIcon from '@mui/icons-material/Delete';
+import { ButtonGroup, Stack, TextField, Typography, Divider, CircularProgress, Skeleton } from '@mui/material';
+import { VideoService } from '../../services';
+import LightTooltip from '../misc/LightTooltip';
+import { TagInput } from '../tags';
+import GameSelector from '../tags/GameSelectorWithQuery';
+import { useQueryClient, useMutation, useQuery } from '@tanstack/react-query';
+import { useVideoGame, useVideoTags } from '../../services/VideoQueryHooks';
 
-//
+// Modal style
 const style = {
   position: 'absolute',
   top: '50%',
@@ -22,163 +25,163 @@ const style = {
   p: 4,
   maxHeight: '90vh',
   overflowY: 'auto'
-}
+};
 
+// Skeleton component for loading state
+const FieldSkeleton = ({ height = 56 }) => (
+  <Skeleton 
+    variant="rectangular" 
+    width="100%" 
+    height={height} 
+    animation="wave"
+    sx={{ bgcolor: 'rgba(255, 255, 255, 0.1)', borderRadius: 1 }} 
+  />
+);
+
+// UpdateDetailsModal using React Query for data fetching
 const UpdateDetailsModal = ({ open, close, videoId, currentTitle, currentDescription, alertHandler }) => {
-  const [title, setTitle] = React.useState(currentTitle)
-  const [description, setDescription] = React.useState(currentDescription)
-  // Use undefined for game during loading to prevent UI flash
-  const [game, setGame] = React.useState(undefined)
-  const [tags, setTags] = React.useState([])
-  const [confirmDelete, setConfirmDelete] = React.useState(false)
-  const [loading, setLoading] = React.useState(false)
-  const [gameLoading, setGameLoading] = React.useState(false)
+  // Query client for invalidation
+  const queryClient = useQueryClient();
   
-  // Load video game and tags when modal opens
+  // Local state
+  const [title, setTitle] = React.useState('');
+  const [description, setDescription] = React.useState('');
+  const [tags, setTags] = React.useState([]);
+  const [showDelete, setShowDelete] = React.useState(false);
+  
+  // Use React Query to fetch data
+  const { data: gameData, isLoading: gameLoading } = useVideoGame(videoId);
+  const { data: tagsData, isLoading: tagsLoading } = useVideoTags(videoId);
+  
+  // Set initial values when data is available
   React.useEffect(() => {
-    // Create a flag to track whether the component is still mounted
-    let isMounted = true;
+    if (!open) return;
     
-    if (open && videoId) {
-      // Reset state and set loading states
-      setLoading(true);
-      setGameLoading(true);
-      setGame(undefined); // Use undefined to prevent UI flashing
-      console.log("Loading video details for videoId:", videoId);
-      
-      // Use Promise.all to load game and tags in parallel
-      Promise.all([
-        // Load the game
-        VideoService.getVideoGame(videoId)
-          .then(response => {
-            console.log("Game API response:", response.data);
-            return response.data && response.data.game ? response.data.game : '';
-          })
-          .catch(error => {
-            console.error('Error loading game:', error);
-            return ''; // Default to empty string on error
-          }),
-          
-        // Load the tags
-        VideoService.getVideoTags(videoId)
-          .then(response => {
-            console.log("Tags API response:", response.data);
-            return response.data && response.data.tags 
-              ? response.data.tags.map(tag => tag.name) 
-              : [];
-          })
-          .catch(error => {
-            console.error('Error loading tags:', error);
-            return []; // Default to empty array on error
-          })
-      ])
-      .then(([gameValue, tagsValue]) => {
-        // Only update state if component is still mounted
-        if (isMounted) {
-          console.log("Setting game to:", gameValue);
-          setGame(gameValue);
-          setTags(tagsValue);
-          setGameLoading(false);
-          setLoading(false);
-        }
+    // Set title/description from props
+    if (currentTitle !== undefined) {
+      setTitle(currentTitle || '');
+    }
+    
+    if (currentDescription !== undefined) {
+      setDescription(currentDescription || '');
+    }
+    
+    // Initialize tags when data is loaded
+    if (tagsData?.data?.tags) {
+      setTags(tagsData.data.tags.map(tag => tag.name));
+    }
+  }, [open, videoId, currentTitle, currentDescription, tagsData]);
+  
+  // Extract the game from the query result
+  const game = gameData?.data?.game || '';
+  
+  // Reset state when modal closes
+  React.useEffect(() => {
+    if (!open) {
+      setShowDelete(false);
+    }
+  }, [open]);
+  
+  // Mutation for saving changes
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      // Update details
+      await VideoService.updateDetails(videoId, {
+        title,
+        description
       });
-    } else if (!open) {
-      // Reset when modal closes
-      setGame(undefined); // Reset to undefined instead of empty string
-      setTags([]);
-      setGameLoading(false);
-      setLoading(false);
-    }
-    
-    // Clean up function to prevent state updates after unmount
-    return () => {
-      isMounted = false;
-    };
-  }, [open, videoId])
-
-  const onTitleChange = (e) => setTitle(e.target.value)
-  const onDescriptionChange = (e) => setDescription(e.target.value)
-
-  const handleClose = (update) => {
-    setConfirmDelete(false)
-    close(update)
-  }
-
-  const handleSave = async () => {
-    // Don't allow saving if still loading game information
-    if (game === undefined || gameLoading) {
-      alertHandler({
-        open: true,
-        type: 'error',
-        message: 'Please wait for game information to load before saving',
-      });
-      return;
-    }
-    
-    // First update video details
-    const update = {
-      title: title || currentTitle,
-      description: description || currentDescription,
-    }
-    try {
-      await VideoService.updateDetails(videoId, update)
       
-      // Then update game - ALWAYS send the game to ensure it's set
-      // (The API will handle cases where game is empty by returning an appropriate error)
-      console.log("Sending game update:", game)
-      await VideoService.setVideoGame(videoId, game)
+      // Update game
+      await VideoService.setVideoGame(videoId, game);
       
-      // Then update tags if provided
+      // Update tags if needed
       if (tags.length > 0) {
-        await VideoService.addVideoTags(videoId, tags)
+        await VideoService.addVideoTags(videoId, tags);
       }
+    },
+    onSuccess: () => {
+      // Show success message
+      alertHandler({
+        open: true,
+        type: 'success',
+        message: 'Video updated successfully!'
+      });
       
-      alertHandler({
-        open: true,
-        type: 'success',
-        message: 'Video details, game, and tags updated!',
-      })
-    } catch (err) {
-      console.error("Error saving video details:", err)
-      alertHandler({
-        open: true,
-        type: 'error',
-        message: `${err.response?.data?.error || 'An unknown error occurred attempting to update the video'}`,
-      })
-    }
-    handleClose({...update, game, tags})
-  }
-
-  const handleDelete = async () => {
-    try {
-      await VideoService.delete(videoId)
-      alertHandler({
-        open: true,
-        type: 'success',
-        message: 'Video has been deleted.',
-      })
-      handleClose('delete')
-    } catch (err) {
+      // Invalidate queries to refresh data
+      queryClient.invalidateQueries(['videoDetails', videoId]);
+      queryClient.invalidateQueries(['videoGame', videoId]);
+      queryClient.invalidateQueries(['videoTags', videoId]);
+      queryClient.invalidateQueries(['videos']);
+      queryClient.invalidateQueries(['publicVideos']);
+      
+      // Close modal with updated data
+      close({
+        title,
+        description,
+        game,
+        tags
+      });
+    },
+    onError: (error) => {
+      console.error('Error saving video details:', error);
       alertHandler({
         open: true,
         type: 'error',
-        message: `${err.respnose?.data || 'An unknown error occurred attempting to delete the video'}`,
-      })
+        message: error.response?.data?.error || 'Failed to update video'
+      });
     }
-  }
-
-  React.useEffect(() => {
-    function update() {
-      setTitle(currentTitle)
-      setDescription(currentDescription)
+  });
+  
+  // Mutation for deleting video
+  const deleteMutation = useMutation({
+    mutationFn: () => VideoService.delete(videoId),
+    onSuccess: () => {
+      alertHandler({
+        open: true,
+        type: 'success',
+        message: 'Video deleted successfully'
+      });
+      
+      // Invalidate queries to refresh lists
+      queryClient.invalidateQueries(['videos']);
+      queryClient.invalidateQueries(['publicVideos']);
+      
+      close('delete');
+    },
+    onError: (error) => {
+      alertHandler({
+        open: true,
+        type: 'error',
+        message: error.response?.data?.error || 'Failed to delete video'
+      });
     }
-    update()
-  }, [currentTitle, currentDescription])
-
+  });
+  
+  // Handle save action
+  const handleSave = () => {
+    saveMutation.mutate();
+  };
+  
+  // Handle delete action
+  const handleDelete = () => {
+    deleteMutation.mutate();
+  };
+  
+  // Close modal
+  const handleClose = () => {
+    close(null);
+  };
+  
+  // Check if any mutation is in progress
+  const isLoading = gameLoading || tagsLoading || saveMutation.isPending || deleteMutation.isPending;
+  
+  // Skip rendering if modal is closed
+  if (!open) return null;
+  
   return (
     <Modal
       open={open}
-      onClose={() => handleClose(null)}
+      onClose={handleClose}
       aria-labelledby="modal-update-details-title"
       aria-describedby="modal-update-details-description"
     >
@@ -188,20 +191,24 @@ const UpdateDetailsModal = ({ open, close, videoId, currentTitle, currentDescrip
             Edit Video Details
           </Typography>
           
+          {/* Title field */}
           <TextField
             id="modal-update-details-title"
             label="Video Title"
-            value={title !== null ? title : currentTitle}
-            onChange={onTitleChange}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            disabled={isLoading}
           />
           
+          {/* Description field */}
           <TextField
             id="modal-update-details-description"
             label="Video Description"
-            value={description !== null ? description : currentDescription}
-            onChange={onDescriptionChange}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
             multiline
             rows={4}
+            disabled={isLoading}
           />
           
           <Divider sx={{ my: 1 }} />
@@ -210,19 +217,17 @@ const UpdateDetailsModal = ({ open, close, videoId, currentTitle, currentDescrip
             Game
           </Typography>
           
+          {/* Game selector with better loading state handling */}
           {gameLoading ? (
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', p: 2, border: 1, borderColor: 'divider', borderRadius: 1 }}>
-              <Typography variant="body2" color="text.secondary" sx={{ mr: 1 }}>
-                Loading game information...
-              </Typography>
-              <CircularProgress size={20} />
-            </Box>
+            <FieldSkeleton />
           ) : (
-            <GameSelector 
-              initialGame={game}
-              onChange={setGame}
-              loading={gameLoading}
-              sx={{ width: '100%', mb: 2 }}
+            <GameSelector
+              initialGame={game} 
+              onChange={(newGame) => {
+                console.log('Game changed to:', newGame);
+                // No need to setState - passing directly to mutation
+              }}
+              disabled={isLoading}
             />
           )}
           
@@ -236,34 +241,61 @@ const UpdateDetailsModal = ({ open, close, videoId, currentTitle, currentDescrip
             Additional Tags
           </Typography>
           
-          <TagInput 
-            initialTags={tags} 
-            onChange={setTags}
-            label="Tags (Optional)" 
-          />
+          {/* Tags input with better loading state handling */}
+          {tagsLoading ? (
+            <FieldSkeleton height={80} />
+          ) : (
+            <TagInput
+              initialTags={tags}
+              onChange={(newTags) => setTags(newTags)}
+              label="Tags (Optional)"
+              disabled={isLoading}
+            />
+          )}
           
           <Typography variant="caption" color="text.secondary">
             Add optional tags like "funny", "highlight", or "tutorial" to make your videos easier to find.
           </Typography>
           
-          <Button 
-            variant="contained" 
+          {/* Save button */}
+          <Button
+            variant="contained"
             onClick={handleSave}
-            disabled={game === ''}
+            disabled={isLoading || !game}
             sx={{ mt: 2 }}
           >
-            Save Changes
+            {saveMutation.isPending ? (
+              <CircularProgress size={24} />
+            ) : (
+              'Save Changes'
+            )}
           </Button>
-
+          
           <Divider sx={{ my: 1 }} />
-
-          {confirmDelete ? (
+          
+          {/* Delete section */}
+          {showDelete ? (
             <ButtonGroup fullWidth>
-              <Button variant="outlined" startIcon={<CancelIcon />} onClick={() => setConfirmDelete(false)}>
+              <Button
+                variant="outlined"
+                startIcon={<CancelIcon />}
+                onClick={() => setShowDelete(false)}
+                disabled={deleteMutation.isPending}
+              >
                 Cancel
               </Button>
-              <Button variant="outlined" color="error" startIcon={<DeleteIcon />} onClick={handleDelete}>
-                Delete
+              <Button
+                variant="outlined"
+                color="error"
+                startIcon={<DeleteIcon />}
+                onClick={handleDelete}
+                disabled={deleteMutation.isPending}
+              >
+                {deleteMutation.isPending ? (
+                  <CircularProgress size={20} />
+                ) : (
+                  'Delete'
+                )}
               </Button>
             </ButtonGroup>
           ) : (
@@ -279,7 +311,8 @@ const UpdateDetailsModal = ({ open, close, videoId, currentTitle, currentDescrip
                 variant="outlined"
                 color="error"
                 startIcon={<DeleteIcon />}
-                onClick={() => setConfirmDelete(true)}
+                onClick={() => setShowDelete(true)}
+                disabled={isLoading}
               >
                 Delete File
               </Button>
@@ -288,7 +321,7 @@ const UpdateDetailsModal = ({ open, close, videoId, currentTitle, currentDescrip
         </Stack>
       </Box>
     </Modal>
-  )
-}
+  );
+};
 
-export default UpdateDetailsModal
+export default UpdateDetailsModal;
