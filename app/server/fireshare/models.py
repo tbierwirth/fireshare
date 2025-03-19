@@ -3,6 +3,7 @@ import datetime
 import enum
 import re
 from flask_login import UserMixin
+from sqlalchemy import select, update, func
 from . import db
 
 class UserRole(enum.Enum):
@@ -112,7 +113,11 @@ class Game(db.Model):
     def find_or_create(cls, name):
         """Find a game by name (case insensitive) or create a new one"""
         slug = cls.generate_slug(name)
-        game = cls.query.filter_by(slug=slug).first()
+        
+        # SQLAlchemy 2.0 query pattern
+        stmt = select(cls).filter_by(slug=slug)
+        game = db.session.execute(stmt).scalar_one_or_none()
+        
         if not game:
             game = cls(name=name, slug=slug)
             db.session.add(game)
@@ -156,7 +161,11 @@ class Tag(db.Model):
     def find_or_create(cls, name):
         """Find a tag by name (case insensitive) or create a new one"""
         slug = cls.generate_slug(name)
-        tag = cls.query.filter_by(slug=slug).first()
+        
+        # SQLAlchemy 2.0 query pattern
+        stmt = select(cls).filter_by(slug=slug)
+        tag = db.session.execute(stmt).scalar_one_or_none()
+        
         if not tag:
             tag = cls(name=name, slug=slug)
             db.session.add(tag)
@@ -197,7 +206,11 @@ class Folder(db.Model):
     def for_tag(cls, tag_name):
         """Get or create a folder for a tag"""
         tag = Tag.find_or_create(tag_name)
-        folder = cls.query.filter_by(tag_id=tag.id).first()
+        
+        # SQLAlchemy 2.0 query pattern
+        stmt = select(cls).filter_by(tag_id=tag.id)
+        folder = db.session.execute(stmt).scalar_one_or_none()
+        
         if not folder:
             folder = cls(
                 name=tag.name,
@@ -213,7 +226,10 @@ class Folder(db.Model):
     @classmethod
     def for_game(cls, game):
         """Get or create a folder for a game"""
-        folder = cls.query.filter_by(game_id=game.id).first()
+        # SQLAlchemy 2.0 query pattern
+        stmt = select(cls).filter_by(game_id=game.id)
+        folder = db.session.execute(stmt).scalar_one_or_none()
+        
         if not folder:
             folder = cls(
                 name=game.name,
@@ -291,11 +307,12 @@ class Video(db.Model):
         
         # Use a direct SQL update to avoid detached instance errors
         try:
-            # Update the video with the game_id and folder_id
-            db.session.query(Video).filter_by(video_id=self.video_id).update({
-                "game_id": game.id, 
-                "folder_id": folder.id
-            })
+            # Update the video with the game_id and folder_id - SQLAlchemy 2.0 pattern
+            stmt = update(Video).where(Video.video_id == self.video_id).values(
+                game_id=game.id, 
+                folder_id=folder.id
+            )
+            db.session.execute(stmt)
             logger.info(f"Explicitly updated video {self.video_id} with game_id={game.id} and folder_id={folder.id}")
             
             # Commit the changes
@@ -307,8 +324,9 @@ class Video(db.Model):
             self.game_id = game.id
             self.folder_id = folder.id
             
-            # Verify the update worked
-            video = Video.query.filter_by(video_id=self.video_id).first()
+            # Verify the update worked - SQLAlchemy 2.0 pattern
+            stmt = select(Video).filter_by(video_id=self.video_id)
+            video = db.session.execute(stmt).scalar_one_or_none()
             logger.info(f"After commit, video {video.video_id} has game_id={video.game_id}")
             
             return game
@@ -331,10 +349,12 @@ class Video(db.Model):
             logger.info(f"Tag found/created with ID: {tag.id}, name: {tag.name}")
             
             # Check if this video already has this tag by querying the association table directly
-            existing = db.session.query(video_tags).filter_by(
-                video_id=self.video_id, 
-                tag_id=tag.id
-            ).first()
+            # SQLAlchemy 2.0 query pattern
+            stmt = select(video_tags).where(
+                (video_tags.c.video_id == self.video_id) & 
+                (video_tags.c.tag_id == tag.id)
+            )
+            existing = db.session.execute(stmt).first()
             
             if not existing:
                 # If the tag is not already associated, create the association
@@ -443,11 +463,16 @@ class VideoView(db.Model):
 
     @classmethod
     def count(cls, video_id):
-        return cls.query.filter_by(video_id=video_id).count()
+        # SQLAlchemy 2.0 query pattern
+        stmt = select(func.count()).select_from(cls).filter_by(video_id=video_id)
+        return db.session.execute(stmt).scalar_one()
 
     @classmethod
     def add_view(cls, video_id, ip_address):
-        exists = cls.query.filter_by(video_id=video_id, ip_address=ip_address).first()
+        # SQLAlchemy 2.0 query pattern
+        stmt = select(cls).filter_by(video_id=video_id, ip_address=ip_address)
+        exists = db.session.execute(stmt).scalar_one_or_none()
+        
         if not exists:
             db.session.add(cls(video_id=video_id, ip_address=ip_address))
             db.session.commit()

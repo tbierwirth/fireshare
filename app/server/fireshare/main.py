@@ -26,14 +26,14 @@ def create_admin_if_needed():
     
     if not admin and not current_app.config['DISABLE_ADMINCREATE']:
         username = current_app.config['ADMIN_USERNAME'] or 'admin'
-        admin_user = User(username=username, password=generate_password_hash(current_app.config['ADMIN_PASSWORD'] or 'admin', method='sha256'), admin=True)
+        admin_user = User(username=username, password=generate_password_hash(current_app.config['ADMIN_PASSWORD'] or 'admin'), admin=True)
         db.session.add(admin_user)
         db.session.commit()
     if admin and not check_password_hash(admin.password, current_app.config['ADMIN_PASSWORD']):
         admin_query = select(User).filter_by(admin=True, ldap=False)
         row = db.session.execute(admin_query).scalar_one_or_none()
         if row:
-            row.password = generate_password_hash(current_app.config['ADMIN_PASSWORD'], method='sha256')
+            row.password = generate_password_hash(current_app.config['ADMIN_PASSWORD'])
             db.session.commit()
     if admin and current_app.config['ADMIN_USERNAME'] and admin.username != current_app.config['ADMIN_USERNAME']:
         admin_query = select(User).filter_by(admin=True, ldap=False)

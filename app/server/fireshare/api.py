@@ -8,7 +8,7 @@ from textwrap import indent
 from flask import Blueprint, render_template, request, Response, jsonify, current_app, send_file, redirect
 from flask_login import current_user, login_required
 from flask_cors import CORS
-from sqlalchemy.sql import text
+from sqlalchemy import select, desc, func, text, or_, delete, update
 from pathlib import Path
 
 
@@ -22,7 +22,9 @@ api = Blueprint('api', __name__, template_folder=templates_path)
 CORS(api, supports_credentials=True)
 
 def get_video_path(id, subid=None):
-    video = Video.query.filter_by(video_id=id).first()
+    # SQLAlchemy 2.0 query pattern
+    stmt = select(Video).filter_by(video_id=id)
+    video = db.session.execute(stmt).scalar_one_or_none()
     if not video:
         raise Exception(f"No video found for {id}")
     paths = current_app.config['PATHS']
@@ -33,7 +35,9 @@ def get_video_path(id, subid=None):
 
 @api.route('/w/<video_id>')
 def video_metadata(video_id):
-    video = Video.query.filter_by(video_id=video_id).first()
+    # SQLAlchemy 2.0 query pattern
+    stmt = select(Video).filter_by(video_id=video_id)
+    video = db.session.execute(stmt).scalar_one_or_none()
     domain = f"https://{current_app.config['DOMAIN']}" if current_app.config['DOMAIN'] else ""
     if video:
         return render_template('metadata.html', video=video.json(), domain=domain)
@@ -99,10 +103,14 @@ def manual_scan():
 @login_required
 def get_videos():
     sort = request.args.get('sort')
+    
+    # SQLAlchemy 2.0 query pattern
     if "views" in sort:
-        videos = Video.query.join(VideoInfo).all()
+        stmt = select(Video).join(VideoInfo)
+        videos = db.session.execute(stmt).scalars().all()
     else:
-        videos = Video.query.join(VideoInfo).order_by(text(sort)).all()
+        stmt = select(Video).join(VideoInfo).order_by(text(sort))
+        videos = db.session.execute(stmt).scalars().all()
 
     videos_json = []
     for v in videos:
@@ -120,25 +128,39 @@ def get_videos():
 @api.route('/api/video/random')
 @login_required
 def get_random_video():
-    row_count = Video.query.count()
-    random_video = Video.query.offset(int(row_count * random.random())).first()
+    # SQLAlchemy 2.0 query pattern
+    stmt = select(func.count()).select_from(Video)
+    row_count = db.session.execute(stmt).scalar_one()
+    
+    stmt = select(Video).offset(int(row_count * random.random()))
+    random_video = db.session.execute(stmt).scalar_one_or_none()
+    
     current_app.logger.info(f"Fetched random video {random_video.video_id}: {random_video.info.title}")
     return jsonify(random_video.json())
 
 @api.route('/api/video/public/random')
 def get_random_public_video():
-    row_count =  Video.query.filter(Video.info.has(private=False)).filter_by(available=True).count()
-    random_video = Video.query.filter(Video.info.has(private=False)).filter_by(available=True).offset(int(row_count * random.random())).first()
+    # SQLAlchemy 2.0 query pattern
+    stmt = select(func.count()).select_from(Video).filter(Video.info.has(private=False)).filter_by(available=True)
+    row_count = db.session.execute(stmt).scalar_one()
+    
+    stmt = select(Video).filter(Video.info.has(private=False)).filter_by(available=True).offset(int(row_count * random.random()))
+    random_video = db.session.execute(stmt).scalar_one_or_none()
+    
     current_app.logger.info(f"Fetched public random video {random_video.video_id}: {random_video.info.title}")
     return jsonify(random_video.json())
 
 @api.route('/api/videos/public')
 def get_public_videos():
     sort = request.args.get('sort')
+    
+    # SQLAlchemy 2.0 query pattern
     if "views" in sort:
-        videos = Video.query.join(VideoInfo).filter_by(private=False)
+        stmt = select(Video).join(VideoInfo).filter_by(private=False)
+        videos = db.session.execute(stmt).scalars().all()
     else:
-        videos = Video.query.join(VideoInfo).filter_by(private=False).order_by(text(sort))
+        stmt = select(Video).join(VideoInfo).filter_by(private=False).order_by(text(sort))
+        videos = db.session.execute(stmt).scalars().all()
     
     videos_json = []
     for v in videos:
@@ -158,15 +180,24 @@ def get_public_videos():
 @api.route('/api/video/delete/<id>', methods=["DELETE"])
 @login_required
 def delete_video(id):
-    video = Video.query.filter_by(video_id=id).first()
+    # SQLAlchemy 2.0 query pattern
+    stmt = select(Video).filter_by(video_id=id)
+    video = db.session.execute(stmt).scalar_one_or_none()
+    
     if video:
         logging.info(f"Deleting video: {video.video_id}")
-        VideoInfo.query.filter_by(video_id=id).delete()
-        Video.query.filter_by(video_id=id).delete()
-        db.session.commit()
+        
+        # Get video info for file paths before deleting
         file_path = f"{current_app.config['VIDEO_DIRECTORY']}/{video.path}"
         link_path = f"{current_app.config['PROCESSED_DIRECTORY']}/video_links/{id}.{video.extension}"
         derived_path = f"{current_app.config['PROCESSED_DIRECTORY']}/derived/{id}"
+        
+        # Delete associated records using SQLAlchemy 2.0 patterns
+        db.session.execute(delete(VideoInfo).filter_by(video_id=id))
+        db.session.execute(delete(Video).filter_by(video_id=id))
+        db.session.commit()
+        
+        # Remove files
         try:
             if os.path.exists(file_path):
                 os.remove(file_path)
@@ -184,21 +215,28 @@ def delete_video(id):
 @api.route('/api/video/details/<id>', methods=["GET", "PUT"])
 def handle_video_details(id):
     if request.method == 'GET':
-        # db lookup and get the details title/views/etc
-        # video_id = request.args['id']
-        video = Video.query.filter_by(video_id=id).first()
+        # SQLAlchemy 2.0 query pattern
+        stmt = select(Video).filter_by(video_id=id)
+        video = db.session.execute(stmt).scalar_one_or_none()
+        
         if video:
             return jsonify(video.json())
         else:
             return jsonify({
                 'message': 'Video not found'
             }), 404
+            
     if request.method == 'PUT':
         if not current_user.is_authenticated:
             return Response(response='You do not have access to this resource.', status=401)
-        video_info = VideoInfo.query.filter_by(video_id=id).first()
+            
+        # SQLAlchemy 2.0 query pattern
+        stmt = select(VideoInfo).filter_by(video_id=id)
+        video_info = db.session.execute(stmt).scalar_one_or_none()
+        
         if video_info:
-            db.session.query(VideoInfo).filter_by(video_id=id).update(request.json)
+            stmt = update(VideoInfo).filter_by(video_id=id).values(**request.json)
+            db.session.execute(stmt)
             db.session.commit()
             return Response(status=201)
         else:
@@ -401,20 +439,30 @@ def get_video():
 @api.route('/api/games', methods=['GET'])
 def get_games():
     """Get all games"""
-    games = Game.query.order_by(Game.name).all()
+    # SQLAlchemy 2.0 query pattern
+    stmt = select(Game).order_by(Game.name)
+    games = db.session.execute(stmt).scalars().all()
     
     # Manually count videos for each game with extra debugging
     games_with_count = []
     for game in games:
         game_json = game.json()
-        video_count = Video.query.filter_by(game_id=game.id).count()
+        
+        # SQLAlchemy 2.0 query pattern for count
+        stmt = select(func.count()).select_from(Video).filter_by(game_id=game.id)
+        video_count = db.session.execute(stmt).scalar_one()
+        
         game_json["video_count"] = video_count
         current_app.logger.debug(f"Game {game.name} (ID: {game.id}) has {video_count} videos")
         games_with_count.append(game_json)
     
-    # Log overall game counts
-    total_videos = Video.query.count()
-    videos_with_games = Video.query.filter(Video.game_id.isnot(None)).count()
+    # Log overall game counts - SQLAlchemy 2.0 pattern
+    stmt = select(func.count()).select_from(Video)
+    total_videos = db.session.execute(stmt).scalar_one()
+    
+    stmt = select(func.count()).select_from(Video).filter(Video.game_id.isnot(None))
+    videos_with_games = db.session.execute(stmt).scalar_one()
+    
     current_app.logger.info(f"Total videos: {total_videos}, Videos with games: {videos_with_games}")
         
     return jsonify({"games": games_with_count})
@@ -428,13 +476,20 @@ def search_games():
     
     # Convert query to lowercase for case-insensitive matching
     query = f"%{query.lower()}%"
-    games = Game.query.filter(Game.slug.like(Game.generate_slug(query))).all()
+    
+    # SQLAlchemy 2.0 query pattern
+    stmt = select(Game).filter(Game.slug.like(Game.generate_slug(query)))
+    games = db.session.execute(stmt).scalars().all()
     
     # Manually count videos for each game
     games_with_count = []
     for game in games:
         game_json = game.json()
-        video_count = Video.query.filter_by(game_id=game.id).count()
+        
+        # SQLAlchemy 2.0 query pattern for count
+        stmt = select(func.count()).select_from(Video).filter_by(game_id=game.id)
+        video_count = db.session.execute(stmt).scalar_one()
+        
         game_json["video_count"] = video_count
         current_app.logger.debug(f"Game {game.name} (ID: {game.id}) has {video_count} videos")
         games_with_count.append(game_json)
@@ -444,7 +499,10 @@ def search_games():
 @api.route('/api/video/<video_id>/game', methods=['GET', 'PUT'])
 def handle_video_game(video_id):
     """Get or set a video's game"""
-    video = Video.query.filter_by(video_id=video_id).first()
+    # SQLAlchemy 2.0 query pattern
+    stmt = select(Video).filter_by(video_id=video_id)
+    video = db.session.execute(stmt).scalar_one_or_none()
+    
     if not video:
         return jsonify({"error": "Video not found"}), 404
         
@@ -466,14 +524,19 @@ def handle_video_game(video_id):
 @api.route('/api/tags', methods=['GET'])
 def get_tags():
     """Get all tags"""
-    tags = Tag.query.order_by(Tag.name).all()
+    # SQLAlchemy 2.0 query pattern
+    stmt = select(Tag).order_by(Tag.name)
+    tags = db.session.execute(stmt).scalars().all()
     
     # Manually count videos for each tag
     tags_with_count = []
     for tag in tags:
         tag_json = tag.json()
         # For tags, we need to count through the association table
-        tag_json["video_count"] = db.session.query(video_tags).filter_by(tag_id=tag.id).count()
+        # SQLAlchemy 2.0 pattern for count on a table
+        stmt = select(func.count()).select_from(video_tags).where(video_tags.c.tag_id == tag.id)
+        video_count = db.session.execute(stmt).scalar_one()
+        tag_json["video_count"] = video_count
         tags_with_count.append(tag_json)
         
     return jsonify({"tags": tags_with_count})
@@ -487,14 +550,19 @@ def search_tags():
     
     # Convert query to lowercase for case-insensitive matching
     query = f"%{query.lower()}%"
-    tags = Tag.query.filter(Tag.slug.like(Tag.generate_slug(query))).all()
+    
+    # SQLAlchemy 2.0 query pattern
+    stmt = select(Tag).filter(Tag.slug.like(Tag.generate_slug(query)))
+    tags = db.session.execute(stmt).scalars().all()
     
     # Manually count videos for each tag
     tags_with_count = []
     for tag in tags:
         tag_json = tag.json()
-        # For tags, we need to count through the association table
-        tag_json["video_count"] = db.session.query(video_tags).filter_by(tag_id=tag.id).count()
+        # For tags, we need to count through the association table - SQLAlchemy 2.0 style
+        stmt = select(func.count()).select_from(video_tags).where(video_tags.c.tag_id == tag.id)
+        video_count = db.session.execute(stmt).scalar_one()
+        tag_json["video_count"] = video_count
         tags_with_count.append(tag_json)
         
     return jsonify({"tags": tags_with_count})
@@ -502,13 +570,20 @@ def search_tags():
 @api.route('/api/folders', methods=['GET'])
 def get_folders():
     """Get all folders"""
-    folders = Folder.query.order_by(Folder.name).all()
+    # SQLAlchemy 2.0 query pattern
+    stmt = select(Folder).order_by(Folder.name)
+    folders = db.session.execute(stmt).scalars().all()
     
     # Manually count videos for each folder
     folders_with_count = []
     for folder in folders:
         folder_json = folder.json()
-        folder_json["video_count"] = Video.query.filter_by(folder_id=folder.id).count()
+        
+        # SQLAlchemy 2.0 count pattern
+        stmt = select(func.count()).select_from(Video).filter_by(folder_id=folder.id)
+        video_count = db.session.execute(stmt).scalar_one()
+        
+        folder_json["video_count"] = video_count
         folders_with_count.append(folder_json)
         
     return jsonify({"folders": folders_with_count})
@@ -516,7 +591,10 @@ def get_folders():
 @api.route('/api/video/<video_id>/tags', methods=['GET', 'POST'])
 def handle_video_tags(video_id):
     """Handle video tags (get or add)"""
-    video = Video.query.filter_by(video_id=video_id).first()
+    # SQLAlchemy 2.0 query pattern
+    stmt = select(Video).filter_by(video_id=video_id)
+    video = db.session.execute(stmt).scalar_one_or_none()
+    
     if not video:
         return jsonify({"error": "Video not found"}), 404
         
@@ -524,8 +602,10 @@ def handle_video_tags(video_id):
         tags_with_count = []
         for tag in video.tags:
             tag_json = tag.json()
-            # For tags, we need to count through the association table
-            tag_json["video_count"] = db.session.query(video_tags).filter_by(tag_id=tag.id).count()
+            # For tags, we need to count through the association table - SQLAlchemy 2.0 style
+            stmt = select(func.count()).select_from(video_tags).where(video_tags.c.tag_id == tag.id)
+            video_count = db.session.execute(stmt).scalar_one()
+            tag_json["video_count"] = video_count
             tags_with_count.append(tag_json)
             
         return jsonify({"tags": tags_with_count})
@@ -549,15 +629,21 @@ def handle_video_tags(video_id):
 @login_required
 def update_video_folder(video_id):
     """Update a video's folder"""
-    video = Video.query.filter_by(video_id=video_id).first()
+    # SQLAlchemy 2.0 query pattern
+    stmt = select(Video).filter_by(video_id=video_id)
+    video = db.session.execute(stmt).scalar_one_or_none()
+    
     if not video:
         return jsonify({"error": "Video not found"}), 404
         
     folder_id = request.json.get('folder_id')
     if not folder_id:
         return jsonify({"error": "No folder ID provided"}), 400
-        
-    folder = Folder.query.get(folder_id)
+    
+    # SQLAlchemy 2.0 query pattern    
+    stmt = select(Folder).filter_by(id=folder_id)
+    folder = db.session.execute(stmt).scalar_one_or_none()
+    
     if not folder:
         return jsonify({"error": "Folder not found"}), 404
         
@@ -572,8 +658,11 @@ def delete_tag(tag_id):
     """Delete a tag (admin only)"""
     if not current_user.is_admin():
         return jsonify({"error": "Admin access required"}), 403
-        
-    tag = Tag.query.get(tag_id)
+    
+    # SQLAlchemy 2.0 query pattern    
+    stmt = select(Tag).filter_by(id=tag_id)
+    tag = db.session.execute(stmt).scalar_one_or_none()
+    
     if not tag:
         return jsonify({"error": "Tag not found"}), 404
         

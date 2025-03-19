@@ -159,7 +159,7 @@ def signup():
     # Create new user
     new_user = User(
         username=username, 
-        password=generate_password_hash(password, method='sha256'),
+        password=generate_password_hash(password),
         email=email,
         role=role,
         admin=(role == UserRole.ADMIN.value),
@@ -216,7 +216,7 @@ def register():
     # Create new user with regular user role
     new_user = User(
         username=username, 
-        password=generate_password_hash(password, method='sha256'),
+        password=generate_password_hash(password),
         email=email,
         role=UserRole.USER.value,
         admin=False,

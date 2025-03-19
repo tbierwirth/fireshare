@@ -8,7 +8,7 @@ from fireshare import create_app, db, util, logger
 from fireshare.models import User, Video, VideoInfo, Tag, Folder
 from werkzeug.security import generate_password_hash
 from pathlib import Path
-from sqlalchemy import func
+from sqlalchemy import func, select, update
 import time
 
 from .constants import SUPPORTED_FILE_EXTENSIONS
@@ -50,7 +50,10 @@ def scan_videos(root):
 
         logger.info(f"Scanning {str(videos_path)} for {', '.join(SUPPORTED_FILE_EXTENSIONS)} video files")
         video_files = [f for f in (videos_path / root if root else videos_path).glob('**/*') if f.is_file() and f.suffix.lower() in SUPPORTED_FILE_EXTENSIONS]
-        video_rows = Video.query.all()
+        
+        # SQLAlchemy 2.0 query pattern
+        stmt = select(Video)
+        video_rows = db.session.execute(stmt).scalars().all()
 
         new_videos = []
         for vf in video_files:
@@ -148,15 +151,21 @@ def scan_video(ctx, path, game, tags, owner_id):
             if existing:
                 if not existing.available:
                     logger.info(f"Updating Video {video_id}, available=True")
-                    db.session.query(Video).filter_by(video_id=existing.video_id).update({ "available": True })
+                    # SQLAlchemy 2.0 update pattern
+                    stmt = update(Video).where(Video.video_id == existing.video_id).values(available=True)
+                    db.session.execute(stmt)
                 if not existing.created_at:
                     created_at = datetime.fromtimestamp(os.path.getctime(f"{videos_path}/{path}"))
                     logger.info(f"Updating Video {video_id}, created_at={created_at}")
-                    db.session.query(Video).filter_by(video_id=existing.video_id).update({ "created_at": created_at })
+                    # SQLAlchemy 2.0 update pattern
+                    stmt = update(Video).where(Video.video_id == existing.video_id).values(created_at=created_at)
+                    db.session.execute(stmt)
                 if not existing.updated_at:
                     updated_at = datetime.fromtimestamp(os.path.getmtime(f"{videos_path}/{path}"))
                     logger.info(f"Updating Video {video_id}, updated_at={updated_at}")
-                    db.session.query(Video).filter_by(video_id=existing.video_id).update({ "updated_at": updated_at })
+                    # SQLAlchemy 2.0 update pattern
+                    stmt = update(Video).where(Video.video_id == existing.video_id).values(updated_at=updated_at)
+                    db.session.execute(stmt)
                 
                 # Update game, tags, and owner if provided
                 video = existing
@@ -169,7 +178,9 @@ def scan_video(ctx, path, game, tags, owner_id):
                 # Add optional tags if provided
                 if tags:
                     # Refresh the video object from the database to ensure it's attached to a session
-                    video_obj = Video.query.filter_by(video_id=video_id).first()
+                    # SQLAlchemy 2.0 query pattern
+                    stmt = select(Video).filter_by(video_id=video_id)
+                    video_obj = db.session.execute(stmt).scalar_one_or_none()
                     if video_obj:
                         tag_list = [t.strip() for t in tags.split(',')]
                         logger.info(f"Adding tags to video {video_id}: {tag_list}")
@@ -178,10 +189,14 @@ def scan_video(ctx, path, game, tags, owner_id):
                                 video_obj.add_tag(tag_name)
                 
                 if owner_id:
-                    user = User.query.get(owner_id)
+                    # SQLAlchemy 2.0 query pattern
+                    stmt = select(User).filter_by(id=owner_id)
+                    user = db.session.execute(stmt).scalar_one_or_none()
                     if user:
                         logger.info(f"Setting owner of video {video_id} to user {user.username} (ID: {user.id})")
-                        db.session.query(Video).filter_by(video_id=video.video_id).update({"owner_id": user.id})
+                        # SQLAlchemy 2.0 update pattern
+                        stmt = update(Video).where(Video.video_id == video.video_id).values(owner_id=user.id)
+                        db.session.execute(stmt)
                 
                 db.session.commit()
             else:
@@ -191,7 +206,9 @@ def scan_video(ctx, path, game, tags, owner_id):
                 
                 # Set owner if provided
                 if owner_id:
-                    user = User.query.get(owner_id)
+                    # SQLAlchemy 2.0 query pattern
+                    stmt = select(User).filter_by(id=owner_id)
+                    user = db.session.execute(stmt).scalar_one_or_none()
                     if user:
                         logger.info(f"Setting owner of new video {video_id} to user {user.username} (ID: {user.id})")
                         v.owner_id = user.id
@@ -217,14 +234,18 @@ def scan_video(ctx, path, game, tags, owner_id):
 
                 logger.info("Syncing metadata")
                 ctx.invoke(sync_metadata, video=video_id)
-                info = VideoInfo.query.filter(VideoInfo.video_id==video_id).one()
+                # SQLAlchemy 2.0 query pattern
+                stmt = select(VideoInfo).filter(VideoInfo.video_id==video_id)
+                info = db.session.execute(stmt).scalar_one()
 
                 # Set game and apply tags after video is fully created
                 try:
                     if game:
                         logger.info(f"Setting game for new video {video_id}: {game}")
                         # Get a fresh copy of the video object to avoid detached instance errors
-                        fresh_video = Video.query.filter_by(video_id=video_id).first()
+                        # SQLAlchemy 2.0 query pattern
+                        stmt = select(Video).filter_by(video_id=video_id)
+                        fresh_video = db.session.execute(stmt).scalar_one_or_none()
                         if fresh_video:
                             fresh_video.set_game(game)
                         else:
@@ -232,7 +253,9 @@ def scan_video(ctx, path, game, tags, owner_id):
                     
                     if tags:
                         # Always refresh the video object from the database to ensure it's attached to a session
-                        video_obj = Video.query.filter_by(video_id=video_id).first()
+                        # SQLAlchemy 2.0 query pattern
+                        stmt = select(Video).filter_by(video_id=video_id)
+                        video_obj = db.session.execute(stmt).scalar_one_or_none()
                         if video_obj:
                             tag_list = [t.strip() for t in tags.split(',')]
                             logger.info(f"Adding tags to new video {video_id}: {tag_list}")
@@ -293,7 +316,9 @@ def repair_symlinks():
             video_links.mkdir()
 
         fd = os.open(str(video_links.absolute()), os.O_DIRECTORY)
-        all_videos = Video.query.all()
+        # SQLAlchemy 2.0 query pattern
+        stmt = select(Video)
+        all_videos = db.session.execute(stmt).scalars().all()
         for nv in all_videos:
             src = Path((paths["video"] / nv.path).absolute())
             dst = Path(paths["processed"] / "video_links" / (nv.video_id + nv.extension))
@@ -313,7 +338,12 @@ def repair_symlinks():
 def sync_metadata(video):
     with create_app().app_context():
         paths = current_app.config['PATHS']
-        videos = VideoInfo.query.filter(VideoInfo.video_id==video).all() if video else VideoInfo.query.filter(VideoInfo.info==None).all()
+        # SQLAlchemy 2.0 query pattern
+        if video:
+            stmt = select(VideoInfo).filter(VideoInfo.video_id==video)
+        else:
+            stmt = select(VideoInfo).filter(VideoInfo.info==None)
+        videos = db.session.execute(stmt).scalars().all()
         logger.info(f'Found {len(videos):,} videos without metadata')
         for v in videos:
             vpath = paths["processed"] / "video_links" / str(v.video_id + v.video.extension)
@@ -360,7 +390,9 @@ def create_web_videos():
     with create_app().app_context():
         paths = current_app.config['PATHS']
         video_links = paths["processed"] / "video_links"
-        videos = Video.query.filter(func.lower(Video.extension)=='.mkv').all()
+        # SQLAlchemy 2.0 query pattern
+        stmt = select(Video).filter(func.lower(Video.extension)=='.mkv')
+        videos = db.session.execute(stmt).scalars().all()
         fd = os.open(str(video_links.absolute()), os.O_DIRECTORY)
         for v in videos:
             vpath = paths["processed"] / "video_links" / str(v.video_id + v.extension)
@@ -396,7 +428,9 @@ def create_web_videos():
 def create_posters(regenerate, skip):
     with create_app().app_context():
         processed_root = Path(current_app.config['PROCESSED_DIRECTORY'])
-        vinfos = VideoInfo.query.all()
+        # SQLAlchemy 2.0 query pattern
+        stmt = select(VideoInfo)
+        vinfos = db.session.execute(stmt).scalars().all()
         logger.info(f"Checking for videos with missing posters...")
         for vi in vinfos:
             derived_path = Path(processed_root, "derived", vi.video_id)
@@ -419,7 +453,9 @@ def create_posters(regenerate, skip):
 def create_boomerang_posters(regenerate):
     with create_app().app_context():
         processed_root = Path(current_app.config['PROCESSED_DIRECTORY'])
-        vinfos = VideoInfo.query.all()
+        # SQLAlchemy 2.0 query pattern
+        stmt = select(VideoInfo)
+        vinfos = db.session.execute(stmt).scalars().all()
         for vi in vinfos:
             derived_path = Path(processed_root, "derived", vi.video_id)
             video_path = Path(processed_root, "video_links", vi.video_id + vi.video.extension)
@@ -469,7 +505,9 @@ def bulk_import(ctx, root, auto_tag):
         # Auto-tag videos based on folder structure if requested
         if auto_tag:
             s = time.time()
-            videos = Video.query.all()
+            # SQLAlchemy 2.0 query pattern
+            stmt = select(Video)
+            videos = db.session.execute(stmt).scalars().all()
             for video in videos:
                 # Use the parent folder name as a tag
                 folder_name = Path(video.path).parent.name
