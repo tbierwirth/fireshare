@@ -160,6 +160,7 @@ dmypy.json
 .pyre/
 ldap
 dev_scripts/
+dev_notes/
 
 # Backup files
 *.bak
