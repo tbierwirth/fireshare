@@ -168,3 +168,6 @@ requirements.pre_upgrade.txt
 
 # Test data
 test-data/
+
+# Project documentation
+CLAUDE.md
