@@ -5,7 +5,7 @@ import VisibilityIcon from '@mui/icons-material/Visibility'
 import EditIcon from '@mui/icons-material/Edit'
 import LinkIcon from '@mui/icons-material/Link'
 import { CopyToClipboard } from 'react-copy-to-clipboard'
-import { getPublicWatchUrl, getServedBy, getUrl, toHHMMSS, useDebounce, getVideoPath } from '../../common/utils'
+import { getPublicWatchUrl, getUrl, toHHMMSS, useDebounce } from '../../common/utils'
 import VideoService from '../../services/VideoService'
 import _ from 'lodash'
 import UpdateDetailsModal from '../modal/UpdateDetailsModal'
@@ -14,15 +14,16 @@ import { TagDisplay } from '../tags'
 
 const URL = getUrl()
 const PURL = getPublicWatchUrl()
-const SERVED_BY = getServedBy()
 
 const CompactVideoCard = ({ 
   video, 
   openVideoHandler, 
   alertHandler, 
   cardWidth, 
+  cardHeight, 
   authenticated, 
   deleted,
+  fitMode = 'cover', // New prop to control how image fits (cover, contain)
   onVideoLoaded = () => {}, // Callback when video poster image loads
   onVideoError = () => {}   // Callback when video poster fails to load
 }) => {
@@ -32,7 +33,9 @@ const CompactVideoCard = ({
   const [description, setDescription] = React.useState(video.info?.description)
   const [updatedTitle, setUpdatedTitle] = React.useState(null)
   const debouncedTitle = useDebounce(updatedTitle, 1500)
-  const [hover, setHover] = React.useState(false)
+  // We keep track of hover state even though we disabled hover preview
+  // for future use if we re-enable the feature
+  const [hover, setHover] = React.useState(false) // eslint-disable-line no-unused-vars
   const [privateView, setPrivateView] = React.useState(video.info?.private)
 
   const [detailsModalOpen, setDetailsModalOpen] = React.useState(false)
@@ -51,14 +54,16 @@ const CompactVideoCard = ({
     previousVideoRef.current = video
   })
 
+  // Disabled hover preview
   const debouncedMouseEnter = React.useRef(
     _.debounce(() => {
-      setHover(true)
+      // Do nothing - hover preview disabled
     }, 750),
   ).current
 
   const handleMouseLeave = () => {
     debouncedMouseEnter.cancel()
+    // Keep hover state false
     setHover(false)
   }
 
@@ -118,8 +123,33 @@ const CompactVideoCard = ({
     }
   }
 
-  const previewVideoHeight =
-    video.info?.width && video.info?.height ? cardWidth * (video.info.height / video.info.width) : cardWidth / 1.77
+  // Get video dimensions or use standard 16:9 if not available
+  let actualWidth = video.info?.width || 1920;  // Default to 1080p width if not specified
+  let actualHeight = video.info?.height || 1080; // Default to 1080p height if not specified
+  
+  // Calculate the actual aspect ratio of this specific video
+  // Use 16:9 (1.78) as fallback if calculations result in invalid values
+  const aspectRatio = actualWidth && actualHeight ? actualWidth / actualHeight : 16/9;
+  
+  // Standard aspect ratio currently unused but kept for future aspect ratio calculations
+  // eslint-disable-next-line no-unused-vars
+  const standardAspectRatio = 16/9; // Standard video aspect ratio for uniform display
+  
+  // Handle percentage-based width (currently unused but kept for future width calculations)
+  // eslint-disable-next-line no-unused-vars
+  const numericWidth = typeof cardWidth === 'string' && cardWidth.includes('%')
+    ? 300 // Default to 300px for calculating height when using percentage width 
+    : cardWidth;
+  
+  // Only log in development and only occasionally to reduce noise
+  if (process.env.NODE_ENV === 'development' && Math.random() < 0.01) {
+    console.log(`Video ${video.video_id} dimensions:`, {
+      width: actualWidth,
+      height: actualHeight,
+      actualAspectRatio: aspectRatio.toFixed(3),
+      cardWidth: cardWidth
+    });
+  }
 
   return (
     <>
@@ -135,8 +165,20 @@ const CompactVideoCard = ({
       <Box
         sx={{
           width: '100%',
-          bgcolor: 'rgba(0, 0, 0, 0)',
+          bgcolor: 'rgba(0, 0, 0, 0.2)',
           lineHeight: 0,
+          borderRadius: '6px',
+          overflow: 'hidden',
+          boxShadow: 1,
+          display: 'block',
+          height: '100%',
+          position: 'relative',
+          zIndex: 1,
+          '&:hover': {
+            boxShadow: 3,
+            transform: 'translateY(-4px)',
+            transition: 'transform 0.3s ease, box-shadow 0.3s ease'
+          }
         }}
       >
         <ButtonGroup
@@ -145,13 +187,8 @@ const CompactVideoCard = ({
           sx={{
             width: '100%',
             background: '#0b132b',
-
-            borderRadius: '6px',
-            borderBottomLeftRadius: 0,
-            borderBottomRightRadius: 0,
-            borderLeft: '1px solid #3399FFAE',
-            borderTop: '1px solid #3399FFAE',
-            borderRight: '1px solid #3399FFAE',
+            display: 'flex',
+            borderRadius: '6px 6px 0 0',
             '.MuiButtonGroup-grouped:not(:last-of-type)': {
               border: 'none',
             },
@@ -182,10 +219,13 @@ const CompactVideoCard = ({
               sx={{
                 pl: authenticated ? 0 : 1.5,
                 pr: 1.5,
-                width: cardWidth,
+                width: '100%', // Use 100% for responsive layout
                 bgcolor: 'rgba(0,0,0,0)',
                 WebkitTextFillColor: '#fff',
                 fontWeight: 575,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
                 '& .MuiInputBase-input.Mui-disabled': {
                   WebkitTextFillColor: '#fff',
                   fontWeight: 575,
@@ -250,56 +290,54 @@ const CompactVideoCard = ({
                 </Grid>
               </Box>
             )}
-            <img
-              src={`${
-                SERVED_BY === 'nginx'
-                  ? `${URL}/_content/derived/${video.video_id}/poster.jpg`
-                  : `${URL}/api/video/poster?id=${video.video_id}`
-              }`}
-              alt=""
-              style={{
-                width: cardWidth,
-                minHeight: previewVideoHeight,
-                border: '1px solid #3399FFAE',
-                borderBottomRightRadius: '6px',
-                borderBottomLeftRadius: '6px',
-                borderTop: 'none',
-                background: 'repeating-linear-gradient(45deg,#606dbc,#606dbc 10px,#465298 10px,#465298 20px)',
+            {/* Based on server code at line 187 in videos.py, we need to use the poster API endpoint */}
+            {/* CRITICAL: Removed cache-busting to prevent image reload during resize */}
+            {/* Hardcoded placeholder for testing */}
+            <div 
+              style={{ 
+                position: 'absolute', 
+                top: 0, left: 0, 
+                width: '100%', 
+                height: '100%', 
+                backgroundColor: '#222',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                zIndex: 1,
+                fontWeight: 'bold'
               }}
-              onLoad={onVideoLoaded}
-              onError={onVideoError}
+            >
+              {video.video_id.substring(0, 8)}
+            </div>
+            
+            {/* Direct img element - more reliable than React */}
+            <img
+              className="video-card-image"
+              src={`${URL}/api/video/poster?id=${video.video_id}&no-cache=${Date.now()}`}
+              alt="Poster"
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                zIndex: 2
+              }}
+              onLoad={(e) => {
+                console.log(`Poster loaded for ${video.video_id}`);
+                e.target.style.zIndex = 3; // Bring to front when loaded
+                onVideoLoaded(e);
+              }}
+              onError={(e) => {
+                console.error(`Failed to load poster for ${video.video_id}`, e);
+                e.target.style.display = 'none'; // Hide if error
+                onVideoError(e);
+              }}
             />
 
-            {hover && (
-              <video
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  opacity: 0,
-                  animationName: 'fadeIn',
-                  animationDuration: '1.5s',
-                  animationFillMode: 'both',
-                  WebkitAnimationName: 'fadeIn',
-                  WebkitAnimationDuration: '1.5s',
-                  WebkitAnimationFillMode: 'both',
-                  border: '1px solid #3399FFAE',
-                  borderBottomRightRadius: '6px',
-                  borderBottomLeftRadius: '6px',
-                  borderTop: 'none',
-                }}
-                width={cardWidth}
-                height={previewVideoHeight}
-                src={`${
-                  SERVED_BY === 'nginx'
-                    ? `${URL}/_content/video/${getVideoPath(video.video_id, video.extension)}`
-                    : `${URL}/api/video?id=${video.extension === '.mkv' ? `${video.video_id}&subid=1` : video.video_id}`
-                }`}
-                muted
-                autoPlay
-                disablePictureInPicture
-              />
-            )}
+            {/* Video hover preview disabled */}
             <Box sx={{ position: 'absolute', bottom: 3, left: 3 }}>
               <CopyToClipboard text={`${PURL}${video.video_id}`}>
                 <IconButton

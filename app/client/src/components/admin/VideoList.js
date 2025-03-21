@@ -1,5 +1,5 @@
 import { Box, Button, Grid, Paper, Typography } from '@mui/material'
-import React, { useCallback, useState, useEffect, useRef } from 'react'
+import React, { useCallback, useState, useEffect } from 'react'
 import SnackbarAlert from '../alert/SnackbarAlert'
 import VideoModal from '../modal/VideoModal'
 import VideoListItem from './VideoListItem'
@@ -25,14 +25,14 @@ const VideoList = ({ videos, loadingIcon = null, feedView = false, authenticated
   })
   
   // Use our custom loading state hook (manages minimum duration and debouncing)
-  const [isLoading, setIsLoading, isFirstLoad] = useLoadingState({
+  const [isLoading, setIsLoading] = useLoadingState({
     minDuration: 800,
     initialState: true,
     debounceToggles: true
   })
   
   // Use our optimistic UI hook to track if videos have been shown before
-  const hadVideos = useOptimisticUI({
+  useOptimisticUI({
     key: SESSION_KEY_VIDEO_LIST,
     data: videos,
     condition: (data) => Array.isArray(data) && data.length > 0
@@ -181,10 +181,10 @@ const VideoList = ({ videos, loadingIcon = null, feedView = false, authenticated
                     item 
                     xs={12}
                     sx={{ 
-                      opacity: 0,
-                      animation: `fadeIn 0.5s ease-in-out forwards ${index * 0.1}s`,
+                      opacity: 1, // Changed from 0 to ensure immediate visibility
+                      animation: `fadeIn 0.3s ease-in-out forwards ${index * 0.05}s`, // Faster animation
                       '@keyframes fadeIn': {
-                        '0%': { opacity: 0, transform: 'translateY(10px)' },
+                        '0%': { opacity: 0.7, transform: 'translateY(5px)' }, // Less dramatic animation
                         '100%': { opacity: 1, transform: 'translateY(0)' }
                       }
                     }}
