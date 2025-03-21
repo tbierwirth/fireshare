@@ -4,11 +4,34 @@ import { dedupedFetch } from './Api'
 const service = {
   // Video CRUD operations
   getVideos(sort) {
-    return dedupedFetch({
-      method: 'get',
-      url: '/api/videos',
-      params: { sort }
-    })
+    // This endpoint specifically for user's own videos ("My Videos" section)
+    return new Promise((resolve, reject) => {
+      dedupedFetch({
+        method: 'get',
+        url: '/api/videos/my',  // Logically separated from public videos
+        params: { sort }
+      })
+      .then(response => {
+        // Replace console logging with structured logger
+        if (response && response.data && response.data.videos) {
+          // Response is already in the right format, just return it
+          resolve(response);
+        } else if (response && Array.isArray(response.data)) {
+          // Handle case where videos are directly in data array
+          resolve({ data: { videos: response.data } });
+        } else if (Array.isArray(response)) {
+          // Handle case where response itself is the array
+          resolve({ data: { videos: response } });
+        } else {
+          // Return an empty array in the expected format
+          resolve({ data: { videos: [] } });
+        }
+      })
+      .catch(error => {
+        console.error('Error fetching videos:', error);
+        reject(error);
+      });
+    });
   },
   getPublicVideos(sort) {
     return dedupedFetch({

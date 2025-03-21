@@ -1,3 +1,3 @@
 export { useAuth, AuthProvider } from './AuthContext';
 export { useConfig, ConfigProvider } from './ConfigContext';
-export { useVideos, VideoProvider } from './VideoContext';
+// VideoContext removed - use direct React Query hooks from VideoQueryHooks.js instead

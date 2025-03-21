@@ -1,13 +1,13 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { VideoService } from '../services';
-import { cache } from '../common/utils';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { 
   usePublicVideos, 
   useVideos as useVideosQuery,
   useGames as useGamesQuery,
   useTags as useTagsQuery,
-  useFolders as useFoldersQuery
+  useFolders as useFoldersQuery,
+  useVideoCache
 } from '../services/VideoQueryHooks';
 
 // Create video context
@@ -50,6 +50,7 @@ export const VideoProvider = ({ children }) => {
       // When videos are successfully loaded, update our state and session tracking
       onSuccess: (res) => {
         const newVideos = res?.data?.videos || [];
+        console.log('Videos loaded:', newVideos.length);
         setVideos(newVideos);
         setHasInitiallyLoaded(true);
         if (newVideos.length > 0) {
@@ -57,9 +58,19 @@ export const VideoProvider = ({ children }) => {
         }
       },
       onError: (err) => {
+        console.error('Failed to fetch videos:', err);
         setError(err?.response?.data || 'Failed to fetch videos');
         setHasInitiallyLoaded(true);
-      }
+      },
+      // Retry more times for data fetching
+      retry: 3,
+      retryDelay: 1000,
+      // Keep previous data during refetches
+      keepPreviousData: true,
+      // Ensure consistent loading behavior
+      refetchOnWindowFocus: true,
+      refetchOnMount: true,
+      staleTime: 60000 // 1 minute
     }
   });
   
@@ -70,6 +81,7 @@ export const VideoProvider = ({ children }) => {
       // When public videos are successfully loaded, update our state and session tracking
       onSuccess: (res) => {
         const newVideos = res?.data?.videos || [];
+        console.log('Public videos loaded:', newVideos.length, res);
         setPublicVideos(newVideos);
         setHasInitiallyLoadedPublic(true);
         if (newVideos.length > 0) {
@@ -77,19 +89,29 @@ export const VideoProvider = ({ children }) => {
         }
       },
       onError: (err) => {
+        console.error('Failed to fetch public videos:', err);
         setError(err?.response?.data || 'Failed to fetch public videos');
         setHasInitiallyLoadedPublic(true);
-      }
+      },
+      // Retry more times for data fetching
+      retry: 3,
+      retryDelay: 1000,
+      // Keep previous data during refetches
+      keepPreviousData: true,
+      // Ensure consistent loading behavior 
+      refetchOnWindowFocus: true,
+      refetchOnMount: true,
+      staleTime: 60000 // 1 minute
     }
   });
   
-  // Use React Query for games
-  const gamesQuery = useGamesQuery();
+  // Use React Query for games with proper array keys
+  const gamesQuery = useGamesQuery('');
   
-  // Use React Query for tags
-  const tagsQuery = useTagsQuery();
+  // Use React Query for tags with proper array keys
+  const tagsQuery = useTagsQuery('');
   
-  // Use React Query for folders
+  // Use React Query for folders with proper array keys
   const foldersQuery = useFoldersQuery();
   
   // Update state with data from queries for backward compatibility
@@ -227,16 +249,23 @@ export const VideoProvider = ({ children }) => {
     return newFolders;
   }, [queryClient]);
   
-  // Enhanced cache invalidation using React Query
+  // Use our new hook for cache invalidation
+  const { refreshVideos } = useVideoCache();
+  
+  // Enhanced cache invalidation using the new hook
   const invalidateVideoCache = useCallback(() => {
-    // Invalidate all video-related queries
-    queryClient.invalidateQueries({ queryKey: ['videos'] });
-    queryClient.invalidateQueries({ queryKey: ['publicVideos'] });
+    console.log("Invalidating video cache in VideoContext (using refreshVideos hook)");
     
-    // For backward compatibility, also clear localStorage cache
-    localStorage.removeItem('videos_updated_at desc');
-    localStorage.removeItem('public_videos_updated_at desc');
-  }, [queryClient]);
+    // Use our shared refreshVideos function
+    refreshVideos();
+    
+    // Additional force refetch for this context's queries for backward compatibility
+    videosQuery.refetch();
+    publicVideosQuery.refetch();
+    gamesQuery.refetch();
+    tagsQuery.refetch();
+    foldersQuery.refetch();
+  }, [refreshVideos, videosQuery, publicVideosQuery, gamesQuery, tagsQuery, foldersQuery]);
   
   // Add video view with React Query mutation support
   const addVideoView = useCallback(async (videoId) => {
@@ -291,6 +320,9 @@ export const VideoProvider = ({ children }) => {
     // Pre-populate query cache with empty arrays to prevent null states
     queryClient.setQueryData(['videos', 'updated_at desc'], { data: { videos: [] } });
     queryClient.setQueryData(['publicVideos', 'updated_at desc'], { data: { videos: [] } });
+    queryClient.setQueryData(['games', ''], { data: { games: [] } });
+    queryClient.setQueryData(['tags', ''], { data: { tags: [] } });
+    queryClient.setQueryData(['folders'], { data: { folders: [] } });
     
     // Check if we've previously loaded videos on any route
     const previouslyHadVideos = sessionStorage.getItem(SESSION_KEY_VIDEOS) === 'true';
@@ -299,6 +331,15 @@ export const VideoProvider = ({ children }) => {
     // Use this knowledge to inform our initial loading state
     setHasInitiallyLoaded(previouslyHadVideos);
     setHasInitiallyLoadedPublic(previouslyHadPublicVideos);
+    
+    // Enable automatic refetch on window focus for main queries
+    queryClient.setDefaultOptions({
+      queries: {
+        refetchOnWindowFocus: true,
+        refetchOnReconnect: true,
+        staleTime: 30000, // Consider data stale after 30 seconds
+      },
+    });
   }, [queryClient]);
   
   return (

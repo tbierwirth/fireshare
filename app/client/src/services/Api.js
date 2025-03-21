@@ -19,7 +19,6 @@ const createDedupedRequest = () => {
     
     // Check if there's already an in-flight request for this exact endpoint+params
     if (cache.isRequestPending(requestKey)) {
-      console.log(`Reusing in-flight request for ${config.url}`);
       // Attach the request key so we can handle it in the response interceptor
       config.requestKey = requestKey;
       config.deduped = true;
@@ -61,7 +60,6 @@ export const dedupedFetch = async (config) => {
   
   // If there's already an in-flight request for this endpoint, return the existing promise
   if (cache.isRequestPending(requestKey)) {
-    console.log(`Reusing in-flight request for ${config.url}`);
     return cache.getPendingRequest(requestKey);
   }
   

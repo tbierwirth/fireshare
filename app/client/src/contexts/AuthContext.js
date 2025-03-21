@@ -1,6 +1,14 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+// eslint-disable-next-line no-unused-vars
 import { AuthService } from '../services';
 import { cache } from '../common/utils';
+import { useQueryClient } from '@tanstack/react-query';
+import { 
+  useAuthStatus, 
+  useUserProfile, 
+  useLogin as useLoginMutation,
+  useLogout as useLogoutMutation
+} from '../services/AuthQueryHooks';
 
 // Create auth context
 const AuthContext = createContext();
@@ -16,166 +24,178 @@ export const useAuth = () => {
 
 // Provider component that wraps the app and makes auth object available
 export const AuthProvider = ({ children }) => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [user, setUser] = useState(null);
+  const queryClient = useQueryClient();
+  const [skipProfileFetch, setSkipProfileFetch] = useState(true);
   
-  // Function to check authentication state with caching
-  const checkAuthStatus = async () => {
-    setIsLoading(true);
+  // Use React Query for auth status
+  const { 
+    data: authData,
+    isLoading: authLoading, 
+    refetch: refetchAuth,
+    isFetching: authFetching
+  } = useAuthStatus({
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    retry: 1
+  });
+  
+  // Extract authentication status from the response
+  const isAuthenticated = !!authData?.data?.user;
+  const rawUserData = authData?.data?.user || null;
+  
+  // Process the authentication response to determine admin status
+  const normalizeAdminStatus = (userData) => {
+    if (!userData) return false;
     
-    try {
-      // Check cache first
-      const cachedAuth = cache.get('auth_status');
-      if (cachedAuth) {
-        console.log('Using cached auth status');
-        setIsLoggedIn(cachedAuth.isLoggedIn);
-        setUser(cachedAuth.user);
-        setIsLoading(false);
-        
-        // Refresh in the background if cached data is more than 5 minutes old
-        const cacheAge = Date.now() - (cachedAuth.timestamp || 0);
-        if (cacheAge > 5 * 60 * 1000) {
-          refreshAuthStatus();
-        }
-        return;
-      }
-      
-      // Check if there's already an in-flight request
-      const requestKey = 'request:get:/api/loggedin:{}'; 
-      if (cache.isRequestPending(requestKey)) {
-        console.log('Reusing in-flight auth check request');
-        await cache.getPendingRequest(requestKey);
-        return; // The refreshAuthStatus flow will handle setting the state
-      }
-      
-      // No cache or expired, fetch from API
-      refreshAuthStatus();
-    } catch (error) {
-      console.error('Auth check error:', error);
-      setIsLoggedIn(false);
-      setUser(null);
-      setIsLoading(false);
+    // DISABLED: Auth context logging
+    /*
+    if (process.env.NODE_ENV === 'development') {
+      console.log('AUTH CONTEXT - Normalizing admin status:', {
+        userData,
+        username: userData.username,
+        is_admin: userData.is_admin,
+        isAdmin: userData.isAdmin,
+        admin: userData.admin,
+        role: userData.role
+      });
     }
+    */
+    
+    // Special case for admin user - the backend special-cases this username
+    if (userData.username === 'admin') {
+      return true;
+    }
+    
+    // Check all possible admin flags consistently
+    // Include role-based check as the backend uses this
+    return userData.is_admin === true || 
+           userData.isAdmin === true || 
+           userData.admin === true ||
+           userData.role === 'admin' ||
+           (userData.roles && Array.isArray(userData.roles) && userData.roles.includes('admin')) ||
+           false;
   };
   
-  // Refresh auth status from the server
-  const refreshAuthStatus = async () => {
-    try {
-      // Create request keys for deduplication
-      const loginRequestKey = 'request:get:/api/loggedin:{}';
-      
-      // Use cache.registerRequest to dedupe the request
-      let authPromise;
-      if (cache.isRequestPending(loginRequestKey)) {
-        console.log('Using existing auth check request');
-        authPromise = cache.getPendingRequest(loginRequestKey);
-      } else {
-        console.log('Creating new auth check request');
-        authPromise = AuthService.isLoggedIn();
-        cache.registerRequest(loginRequestKey, authPromise);
-      }
-      
-      const authRes = await authPromise;
-      const isAuthenticated = authRes.data;
-      setIsLoggedIn(isAuthenticated);
-      
-      // If logged in, get user profile
-      if (isAuthenticated) {
-        try {
-          const profileRequestKey = 'request:get:/api/profile:{}';
-          
-          let profilePromise;
-          if (cache.isRequestPending(profileRequestKey)) {
-            console.log('Using existing profile request');
-            profilePromise = cache.getPendingRequest(profileRequestKey);
-          } else {
-            console.log('Creating new profile request');
-            profilePromise = AuthService.getProfile();
-            cache.registerRequest(profileRequestKey, profilePromise);
-          }
-          
-          const profileRes = await profilePromise;
-          setUser(profileRes.data);
-        } catch (err) {
-          console.error('Error fetching user profile:', err);
-          setUser(null);
-        }
-      } else {
-        setUser(null);
-      }
-      
-      // Update cache
-      cache.set('auth_status', {
-        isLoggedIn: isAuthenticated,
-        user: isAuthenticated ? user : null,
-        timestamp: Date.now()
-      }, 15 * 60 * 1000); // 15 minute TTL
-    } catch (err) {
-      console.error('Authentication check failed:', err);
-      setIsLoggedIn(false);
-      setUser(null);
-      
-      // Clear cache on error
-      localStorage.removeItem('auth_status');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // Set normalized user data with consistent admin flag
+  const normalizedUserData = rawUserData ? {
+    ...rawUserData,
+    is_admin: normalizeAdminStatus(rawUserData),
+    isAdmin: normalizeAdminStatus(rawUserData)
+  } : null;
   
-  // Login user and set auth state
+  // Track if user is an admin based on the normalized data
+  const isAdmin = normalizedUserData ? normalizedUserData.is_admin : false;
+  
+  // Fetch profile data when auth status changes (only if authenticated)
+  const { 
+    // eslint-disable-next-line no-unused-vars
+    data: profileData,
+    isLoading: profileLoading,
+    refetch: refetchProfile
+  } = useUserProfile(isAuthenticated && !skipProfileFetch, {
+    enabled: isAuthenticated && !skipProfileFetch,
+    onSuccess: (data) => {
+      // DISABLED: Profile data logging
+      // console.log('Profile data fetched successfully:', data);
+      
+      // Update the cache with the new profile data
+      const userData = data?.data?.user || data?.data || null;
+      if (userData) {
+        cache.set('user_profile', {
+          user: {
+            ...userData,
+            is_admin: normalizeAdminStatus(userData),
+            isAdmin: normalizeAdminStatus(userData)
+          },
+          timestamp: Date.now()
+        }, 5 * 60 * 1000); // 5 minute TTL
+      }
+    }
+  });
+  
+  // Use mutations for login and logout
+  const loginMutation = useLoginMutation();
+  const logoutMutation = useLogoutMutation();
+  
+  // Login function that uses the mutation
   const login = async (username, password) => {
     try {
-      const res = await AuthService.login(username, password);
-      setIsLoggedIn(true);
+      console.log(`Login attempt for ${username}`);
       
-      // Get user profile after login
-      try {
-        const profileRes = await AuthService.getProfile();
-        setUser(profileRes.data);
-      } catch (err) {
-        console.error('Error fetching user profile after login:', err);
-      }
+      // Clear any existing auth data
+      localStorage.removeItem('auth_status');
+      cache.remove('user_profile');
       
-      // Update cache with new auth status
-      cache.set('auth_status', {
-        isLoggedIn: true,
-        user: user,
-        timestamp: Date.now()
-      }, 15 * 60 * 1000);
+      // Execute the login mutation
+      const result = await loginMutation.mutateAsync({ username, password });
+      console.log('Login successful:', result);
       
-      return res;
-    } catch (err) {
-      console.error('Login failed:', err);
-      throw err;
+      // Force a refresh of auth status
+      setSkipProfileFetch(false);
+      await refetchAuth();
+      
+      return result;
+    } catch (error) {
+      console.error('Login failed:', error);
+      throw error;
     }
   };
   
-  // Logout user and clear auth state
+  // Logout function that uses the mutation
   const logout = async () => {
     try {
-      await AuthService.logout();
-    } catch (err) {
-      console.error('Logout API error:', err);
-    } finally {
-      setIsLoggedIn(false);
-      setUser(null);
+      await logoutMutation.mutateAsync();
       
-      // Clear auth cache
+      // Clear any cached auth data
       localStorage.removeItem('auth_status');
+      cache.remove('user_profile');
+      
+      // Force auth query to refresh with logged out state
+      await refetchAuth();
+      
+      console.log('Logout completed successfully');
+    } catch (error) {
+      console.error('Logout failed:', error);
+      
+      // Even if the API call fails, clear local state
+      queryClient.clear();
     }
   };
   
-  // Check auth status on initial load
+  // Refresh auth status manually (for use in components)
+  const refreshAuthStatus = async () => {
+    console.log('Manually refreshing auth status');
+    
+    // Clear cache and force a fresh fetch
+    localStorage.removeItem('auth_status');
+    cache.remove('user_profile');
+    
+    // Enable profile fetching and refetch auth data
+    setSkipProfileFetch(false);
+    await refetchAuth();
+    
+    if (isAuthenticated) {
+      await refetchProfile();
+    }
+  };
+  
+  // Set up the initial auth check when component mounts
   useEffect(() => {
-    checkAuthStatus();
-  }, []);
+    // After the first auth check completes, enable profile fetching
+    if (!authLoading && !authFetching && isAuthenticated) {
+      setSkipProfileFetch(false);
+    }
+  }, [authLoading, authFetching, isAuthenticated]);
+  
+  // Determine overall loading state
+  const isLoading = authLoading || (profileLoading && isAuthenticated);
   
   // Create the auth value with all the needed data and functions
   const authValue = {
-    isLoggedIn,
+    isLoggedIn: isAuthenticated,
     isLoading,
-    user,
+    isAdmin,
+    user: normalizedUserData,
     login,
     logout,
     refreshAuthStatus
