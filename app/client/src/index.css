@@ -200,3 +200,15 @@ video {
 .video-card-container {
   transition-property: width, height !important;
 }
+
+/* Fix button group border issues */
+.MuiButtonGroup-root .MuiButtonGroup-grouped {
+  border: none !important;
+  border-right: none !important;
+  border-left: none !important;
+}
+
+/* Ensure no divider lines in button groups */
+.MuiButtonGroup-root .MuiDivider-root {
+  display: none !important;
+}
