@@ -1,127 +1,81 @@
-import React, { useState, useEffect } from 'react';
-import {
-  Box,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  TextField,
-  Typography,
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  IconButton,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Chip,
-} from '@mui/material';
+import React from 'react';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
+import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
+import Paper from '@mui/material/Paper';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+import IconButton from '@mui/material/IconButton';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
+// Import Material UI icons properly
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import Chip from '@mui/material/Chip';
+import CircularProgress from '@mui/material/CircularProgress';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import { AuthService } from '../../services';
 import SnackbarAlert from '../alert/SnackbarAlert';
+import useInviteManagement from './hooks/useInviteManagement';
+import { useAuth } from '../../contexts';
 
 const InviteManager = () => {
-  const [invites, setInvites] = useState([]);
-  const [, setLoading] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [email, setEmail] = useState('');
-  const [expiresDays, setExpiresDays] = useState(7);
-  const [alert, setAlert] = useState({ open: false, message: '', severity: 'info' });
+  // Use the custom hook for invite management
+  const {
+    // Data
+    invites,
+    email,
+    expiresDays,
+    
+    // State
+    isLoading,
+    dialogOpen,
+    alert,
+    
+    // Mutations loading states
+    isCreating,
+    isDeleting,
+    
+    // State setters
+    setEmail,
+    setExpiresDays,
+    setDialogOpen,
+    setAlert,
+    
+    // Actions
+    handleCreateInvite,
+    handleDeleteInvite,
+    copyToClipboard,
+    
+    // Helpers
+    getStatusColor,
+    formatDate,
+  } = useInviteManagement();
 
-  useEffect(() => {
-    loadInvites();
-  }, []);
-
-  const loadInvites = async () => {
-    try {
-      setLoading(true);
-      const response = await AuthService.getInvites();
-      setInvites(response.data.invites);
-    } catch (error) {
-      setAlert({
-        open: true,
-        message: 'Failed to load invites',
-        severity: 'error',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCreateInvite = async () => {
-    try {
-      const response = await AuthService.createInvite(email, expiresDays);
-      setInvites([response.data.invite, ...invites]);
-      setDialogOpen(false);
-      setEmail('');
-      setExpiresDays(7);
-      
-      setAlert({
-        open: true,
-        message: 'Invite code created successfully',
-        severity: 'success',
-      });
-    } catch (error) {
-      setAlert({
-        open: true,
-        message: 'Failed to create invite code',
-        severity: 'error',
-      });
-    }
-  };
-
-  const handleDeleteInvite = async (inviteId) => {
-    try {
-      await AuthService.deleteInvite(inviteId);
-      setInvites(invites.filter(invite => invite.id !== inviteId));
-      
-      setAlert({
-        open: true,
-        message: 'Invite code deleted',
-        severity: 'success',
-      });
-    } catch (error) {
-      setAlert({
-        open: true,
-        message: 'Failed to delete invite code',
-        severity: 'error',
-      });
-    }
-  };
-
-  const copyToClipboard = (code) => {
-    navigator.clipboard.writeText(code);
-    setAlert({
-      open: true,
-      message: 'Invite code copied to clipboard',
-      severity: 'info',
-    });
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'valid':
-        return 'success';
-      case 'used':
-        return 'secondary';
-      case 'expired':
-        return 'error';
-      default:
-        return 'default';
-    }
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleString();
-  };
+  // Get auth status directly
+  const { isAdmin: authIsAdmin, user: authUser } = useAuth();
+  
+  // Log the current auth status for debugging
+  console.log('InviteManager - Component render state:', {
+    invites,
+    isLoading,
+    authIsAdmin,
+    userRole: authUser?.role,
+    rawIsAdmin: authUser?.isAdmin,
+    dialogOpen,
+    isCreating,
+    isDeleting
+  });
 
   return (
     <>
@@ -138,7 +92,10 @@ const InviteManager = () => {
         <Button 
           variant="contained" 
           color="primary" 
-          onClick={() => setDialogOpen(true)}
+          onClick={() => {
+            console.log('Opening create invite dialog');
+            setDialogOpen(true);
+          }}
         >
           Create New Invite
         </Button>
@@ -157,7 +114,16 @@ const InviteManager = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {invites.length === 0 ? (
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
+                  <CircularProgress size={40} />
+                  <Typography variant="body2" sx={{ mt: 1 }}>
+                    Loading invite codes...
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            ) : invites.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} align="center">
                   No invite codes found
@@ -169,7 +135,11 @@ const InviteManager = () => {
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
                       {invite.code}
-                      <IconButton size="small" onClick={() => copyToClipboard(invite.code)}>
+                      <IconButton 
+                        size="small" 
+                        onClick={() => copyToClipboard(invite.code)}
+                        disabled={isDeleting}
+                      >
                         <ContentCopyIcon fontSize="small" />
                       </IconButton>
                     </Box>
@@ -189,8 +159,13 @@ const InviteManager = () => {
                       <IconButton 
                         color="error" 
                         onClick={() => handleDeleteInvite(invite.id)}
+                        disabled={isDeleting}
                       >
-                        <DeleteIcon />
+                        {isDeleting && invite.id === isDeleting ? (
+                          <CircularProgress size={24} color="inherit" />
+                        ) : (
+                          <DeleteIcon />
+                        )}
                       </IconButton>
                     )}
                   </TableCell>
@@ -201,7 +176,17 @@ const InviteManager = () => {
         </Table>
       </TableContainer>
 
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)}>
+      <Dialog 
+        open={dialogOpen} 
+        onClose={() => {
+          if (!isCreating) {
+            console.log('Closing create invite dialog');
+            setDialogOpen(false);
+          }
+        }}
+        fullWidth
+        keepMounted={true}
+      >
         <DialogTitle>Create New Invite Code</DialogTitle>
         <DialogContent>
           <TextField
@@ -215,14 +200,18 @@ const InviteManager = () => {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             helperText="If provided, only this email can use the invite code"
+            disabled={isCreating}
             sx={{ mb: 2 }}
           />
-          <FormControl fullWidth variant="outlined">
-            <InputLabel>Expires in</InputLabel>
+          <FormControl fullWidth variant="outlined" disabled={isCreating}>
+            <InputLabel id="expires-label">Expires in</InputLabel>
             <Select
+              labelId="expires-label"
+              id="expires-select"
               value={expiresDays}
               onChange={(e) => setExpiresDays(e.target.value)}
               label="Expires in"
+              IconComponent={KeyboardArrowDownIcon}
             >
               <MenuItem value={1}>1 day</MenuItem>
               <MenuItem value={7}>7 days</MenuItem>
@@ -232,9 +221,20 @@ const InviteManager = () => {
           </FormControl>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
-          <Button onClick={handleCreateInvite} variant="contained" color="primary">
-            Create
+          <Button 
+            onClick={() => setDialogOpen(false)}
+            disabled={isCreating}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleCreateInvite} 
+            variant="contained" 
+            color="primary"
+            disabled={isCreating}
+            startIcon={isCreating && <CircularProgress size={20} color="inherit" />}
+          >
+            {isCreating ? 'Creating...' : 'Create'}
           </Button>
         </DialogActions>
       </Dialog>

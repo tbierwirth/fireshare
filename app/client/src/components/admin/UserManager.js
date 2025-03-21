@@ -1,152 +1,68 @@
-import React, { useState, useEffect } from 'react';
-import {
-  Box,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  TextField,
-  Typography,
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  IconButton,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Chip,
-} from '@mui/material';
+import React from 'react';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
+import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
+import Paper from '@mui/material/Paper';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+import IconButton from '@mui/material/IconButton';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem'; 
+// Import Material UI icons properly
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import Chip from '@mui/material/Chip';
+import CircularProgress from '@mui/material/CircularProgress';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
-import { AuthService } from '../../services';
 import SnackbarAlert from '../alert/SnackbarAlert';
+import useUserManagement from './hooks/useUserManagement';
+import { useAuth } from '../../contexts';
 
 const UserManager = () => {
-  const [users, setUsers] = useState([]);
-  const [, setLoading] = useState(true);
-  const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState(null);
-  const [newUser, setNewUser] = useState({
-    username: '',
-    password: '',
-    email: '',
-    display_name: '',
-    role: 'user',
-  });
-  const [alert, setAlert] = useState({ open: false, message: '', severity: 'info' });
-
-  useEffect(() => {
-    loadUsers();
-  }, []);
-
-  const loadUsers = async () => {
-    try {
-      setLoading(true);
-      const response = await AuthService.getUsers();
-      setUsers(response.data.users);
-    } catch (error) {
-      setAlert({
-        open: true,
-        message: 'Failed to load users',
-        severity: 'error',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCreateUser = async () => {
-    try {
-      const response = await AuthService.createUser(newUser);
-      setUsers([...users, response.data.user]);
-      setCreateDialogOpen(false);
-      setNewUser({
-        username: '',
-        password: '',
-        email: '',
-        display_name: '',
-        role: 'user',
-      });
-      
-      setAlert({
-        open: true,
-        message: 'User created successfully',
-        severity: 'success',
-      });
-    } catch (error) {
-      setAlert({
-        open: true,
-        message: error.response?.data || 'Failed to create user',
-        severity: 'error',
-      });
-    }
-  };
-
-  const handleEditUser = async () => {
-    try {
-      const response = await AuthService.updateUser(editingUser.id, {
-        display_name: editingUser.display_name,
-        email: editingUser.email,
-        role: editingUser.role,
-        status: editingUser.status,
-      });
-      
-      setUsers(users.map(user => 
-        user.id === editingUser.id ? response.data.user : user
-      ));
-      
-      setEditDialogOpen(false);
-      setEditingUser(null);
-      
-      setAlert({
-        open: true,
-        message: 'User updated successfully',
-        severity: 'success',
-      });
-    } catch (error) {
-      setAlert({
-        open: true,
-        message: error.response?.data || 'Failed to update user',
-        severity: 'error',
-      });
-    }
-  };
-
-  const handleDeleteUser = async (userId) => {
-    if (!window.confirm('Are you sure you want to delete this user?')) {
-      return;
-    }
+  // Use the custom hook for user management
+  const {
+    // Data
+    users,
+    newUser,
+    editingUser,
     
-    try {
-      await AuthService.deleteUser(userId);
-      setUsers(users.filter(user => user.id !== userId));
-      
-      setAlert({
-        open: true,
-        message: 'User deleted successfully',
-        severity: 'success',
-      });
-    } catch (error) {
-      setAlert({
-        open: true,
-        message: error.response?.data || 'Failed to delete user',
-        severity: 'error',
-      });
-    }
-  };
+    // State
+    isLoading,
+    createDialogOpen,
+    editDialogOpen,
+    alert,
+    
+    // Mutations loading states
+    isCreating,
+    isUpdating,
+    isDeleting,
+    
+    // State setters
+    setNewUser,
+    setEditingUser,
+    setCreateDialogOpen,
+    setEditDialogOpen,
+    setAlert,
+    
+    // Actions
+    handleCreateUser,
+    handleEditUser,
+    handleDeleteUser,
+    handleEditClick,
+  } = useUserManagement();
 
-  const handleEditClick = (user) => {
-    setEditingUser({...user});
-    setEditDialogOpen(true);
-  };
-
+  // Helper functions for UI display
   const getRoleColor = (role) => {
     return role === 'admin' ? 'error' : 'primary';
   };
@@ -169,6 +85,23 @@ const UserManager = () => {
     return new Date(dateString).toLocaleString();
   };
 
+  // Get auth status directly
+  const { isAdmin: authIsAdmin, user: authUser } = useAuth();
+  
+  // Log the current auth status for debugging
+  console.log('UserManager - Component render state:', {
+    users,
+    isLoading,
+    authIsAdmin,
+    userRole: authUser?.role,
+    rawIsAdmin: authUser?.isAdmin,
+    createDialogOpen,
+    editDialogOpen,
+    isCreating,
+    isUpdating,
+    isDeleting
+  });
+
   return (
     <>
       <SnackbarAlert 
@@ -181,13 +114,7 @@ const UserManager = () => {
       
       <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Typography variant="h5">User Management</Typography>
-        <Button 
-          variant="contained" 
-          color="primary" 
-          onClick={() => setCreateDialogOpen(true)}
-        >
-          Create New User
-        </Button>
+        {/* Direct user creation button removed - users are created through invite system */}
       </Box>
 
       <TableContainer component={Paper}>
@@ -204,7 +131,16 @@ const UserManager = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {users.length === 0 ? (
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={7} align="center" sx={{ py: 3 }}>
+                  <CircularProgress size={40} />
+                  <Typography variant="body2" sx={{ mt: 1 }}>
+                    Loading users...
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            ) : users.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} align="center">
                   No users found
@@ -235,14 +171,16 @@ const UserManager = () => {
                     <IconButton 
                       color="primary" 
                       onClick={() => handleEditClick(user)}
+                      disabled={isDeleting} // Disable during delete operation
                     >
                       <EditIcon />
                     </IconButton>
                     <IconButton 
                       color="error" 
                       onClick={() => handleDeleteUser(user.id)}
+                      disabled={isDeleting} // Disable during delete operation
                     >
-                      <DeleteIcon />
+                      {isDeleting ? <CircularProgress size={24} /> : <DeleteIcon />}
                     </IconButton>
                   </TableCell>
                 </TableRow>
@@ -253,7 +191,17 @@ const UserManager = () => {
       </TableContainer>
 
       {/* Create User Dialog */}
-      <Dialog open={createDialogOpen} onClose={() => setCreateDialogOpen(false)} fullWidth>
+      <Dialog 
+        open={createDialogOpen} 
+        onClose={() => {
+          if (!isCreating) {
+            console.log('Closing create user dialog');
+            setCreateDialogOpen(false);
+          }
+        }} 
+        fullWidth
+        keepMounted={true}
+      >
         <DialogTitle>Create New User</DialogTitle>
         <DialogContent>
           <TextField
@@ -266,6 +214,7 @@ const UserManager = () => {
             value={newUser.username}
             onChange={(e) => setNewUser({...newUser, username: e.target.value})}
             required
+            disabled={isCreating}
             sx={{ mb: 2 }}
           />
           <TextField
@@ -278,6 +227,7 @@ const UserManager = () => {
             value={newUser.password}
             onChange={(e) => setNewUser({...newUser, password: e.target.value})}
             required
+            disabled={isCreating}
             sx={{ mb: 2 }}
           />
           <TextField
@@ -289,6 +239,7 @@ const UserManager = () => {
             variant="outlined"
             value={newUser.email}
             onChange={(e) => setNewUser({...newUser, email: e.target.value})}
+            disabled={isCreating}
             sx={{ mb: 2 }}
           />
           <TextField
@@ -299,14 +250,18 @@ const UserManager = () => {
             variant="outlined"
             value={newUser.display_name}
             onChange={(e) => setNewUser({...newUser, display_name: e.target.value})}
+            disabled={isCreating}
             sx={{ mb: 2 }}
           />
-          <FormControl fullWidth variant="outlined">
-            <InputLabel>Role</InputLabel>
+          <FormControl fullWidth variant="outlined" disabled={isCreating}>
+            <InputLabel id="create-role-label">Role</InputLabel>
             <Select
+              labelId="create-role-label"
+              id="create-role-select"
               value={newUser.role}
               onChange={(e) => setNewUser({...newUser, role: e.target.value})}
               label="Role"
+              IconComponent={KeyboardArrowDownIcon}
             >
               <MenuItem value="user">User</MenuItem>
               <MenuItem value="admin">Admin</MenuItem>
@@ -314,21 +269,31 @@ const UserManager = () => {
           </FormControl>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setCreateDialogOpen(false)}>Cancel</Button>
+          <Button 
+            onClick={() => setCreateDialogOpen(false)} 
+            disabled={isCreating}
+          >
+            Cancel
+          </Button>
           <Button 
             onClick={handleCreateUser} 
             variant="contained" 
             color="primary"
-            disabled={!newUser.username || !newUser.password}
+            disabled={!newUser.username || !newUser.password || isCreating}
+            startIcon={isCreating && <CircularProgress size={20} color="inherit" />}
           >
-            Create
+            {isCreating ? 'Creating...' : 'Create'}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Edit User Dialog */}
       {editingUser && (
-        <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} fullWidth>
+        <Dialog 
+          open={editDialogOpen} 
+          onClose={() => !isUpdating && setEditDialogOpen(false)} 
+          fullWidth
+        >
           <DialogTitle>Edit User: {editingUser.username}</DialogTitle>
           <DialogContent>
             <TextField
@@ -340,6 +305,7 @@ const UserManager = () => {
               variant="outlined"
               value={editingUser.email || ''}
               onChange={(e) => setEditingUser({...editingUser, email: e.target.value})}
+              disabled={isUpdating}
               sx={{ mb: 2 }}
             />
             <TextField
@@ -350,25 +316,32 @@ const UserManager = () => {
               variant="outlined"
               value={editingUser.display_name || ''}
               onChange={(e) => setEditingUser({...editingUser, display_name: e.target.value})}
+              disabled={isUpdating}
               sx={{ mb: 2 }}
             />
-            <FormControl fullWidth variant="outlined" sx={{ mb: 2 }}>
-              <InputLabel>Role</InputLabel>
+            <FormControl fullWidth variant="outlined" sx={{ mb: 2 }} disabled={isUpdating}>
+              <InputLabel id="edit-role-label">Role</InputLabel>
               <Select
+                labelId="edit-role-label"
+                id="edit-role-select"
                 value={editingUser.role || 'user'}
                 onChange={(e) => setEditingUser({...editingUser, role: e.target.value})}
                 label="Role"
+                IconComponent={KeyboardArrowDownIcon}
               >
                 <MenuItem value="user">User</MenuItem>
                 <MenuItem value="admin">Admin</MenuItem>
               </Select>
             </FormControl>
-            <FormControl fullWidth variant="outlined">
-              <InputLabel>Status</InputLabel>
+            <FormControl fullWidth variant="outlined" disabled={isUpdating}>
+              <InputLabel id="edit-status-label">Status</InputLabel>
               <Select
+                labelId="edit-status-label"
+                id="edit-status-select"
                 value={editingUser.status || 'active'}
                 onChange={(e) => setEditingUser({...editingUser, status: e.target.value})}
                 label="Status"
+                IconComponent={KeyboardArrowDownIcon}
               >
                 <MenuItem value="active">Active</MenuItem>
                 <MenuItem value="suspended">Suspended</MenuItem>
@@ -377,13 +350,20 @@ const UserManager = () => {
             </FormControl>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
+            <Button 
+              onClick={() => setEditDialogOpen(false)}
+              disabled={isUpdating}
+            >
+              Cancel
+            </Button>
             <Button 
               onClick={handleEditUser} 
               variant="contained" 
               color="primary"
+              disabled={isUpdating}
+              startIcon={isUpdating && <CircularProgress size={20} color="inherit" />}
             >
-              Save Changes
+              {isUpdating ? 'Saving...' : 'Save Changes'}
             </Button>
           </DialogActions>
         </Dialog>
