@@ -266,17 +266,18 @@ function Navbar20({
       }
     }
   }
-  // Handler for size changes - SliderWrapper now handles most of the work
-  // We just need to store the value in localStorage for persistence
+  // Handle card size changes from the slider
   const handleCardSizeChange = (e, value) => {
     // Map slider value (0-100) to a pixel size
     const newSize = Math.round(CARD_SIZE_MIN + ((CARD_SIZE_MAX - CARD_SIZE_MIN) * (value / 100)))
+    
+    // Set the CSS variable directly for immediate visual update
+    document.documentElement.style.setProperty('--card-size', `${newSize}px`);
     
     // Store the new card size in localStorage 
     setSetting('cardSize', newSize);
     
     // Update React state with the new size
-    // This should be safe now with our optimized SliderWrapper implementation
     setCardSize(newSize);
     
     // Log for debugging

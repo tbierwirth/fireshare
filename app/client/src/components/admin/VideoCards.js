@@ -67,11 +67,8 @@ const VideoCards = ({
   // Reference to track previous size for change detection
   const prevSizeRef = useRef(size);
   
-  // Handle card size changes via CSS variables
+  // Simple check to log card size changes
   useEffect(() => {
-    // Skip if size hasn't changed significantly
-    if (prevSizeRef.current === size) return;
-    
     // Use size or fallback to default
     const currentSize = size || 300;
     
@@ -83,11 +80,8 @@ const VideoCards = ({
     // Update ref for future comparisons
     prevSizeRef.current = currentSize;
     
-    // For VideoCards component, we primarily rely on the CSS variable set by SliderWrapper
-    // This is just a fallback to ensure consistency
-    if (currentSize > 0) {
-      document.documentElement.style.setProperty('--card-size', `${currentSize}px`);
-    }
+    // Let CSS variables handle the sizing through the stylesheet
+    // No direct DOM manipulation needed
   }, [size]);
   
   // CRITICAL FIX: Ensure the videos are always available and local state is updated
