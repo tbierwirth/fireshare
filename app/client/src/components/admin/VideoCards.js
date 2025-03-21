@@ -266,6 +266,7 @@ const VideoCards = ({
                       // No explicit height - will be calculated based on video aspect ratio
                       authenticated={authenticated}
                       deleted={handleDelete}
+                      feedView={feedView}
                     />
                   </Box>
                 ))}
