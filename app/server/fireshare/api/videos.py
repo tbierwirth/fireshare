@@ -16,10 +16,11 @@ from .utils.response_helpers import api_error, api_success
 # Create blueprint with URL prefix
 videos_bp = Blueprint('videos', __name__, url_prefix='/api/videos')
 
+# Keep the original endpoint for backward compatibility
 @videos_bp.route('', methods=['GET'])
 @login_required
 def get_videos():
-    """Get all videos with sorting options"""
+    """Get all videos with sorting options (LEGACY ENDPOINT)"""
     sort = request.args.get('sort')
     
     # SQLAlchemy 2.0 query pattern
@@ -41,7 +42,55 @@ def get_videos():
     if sort == 'views desc':
         videos_json = sorted(videos_json, key=lambda d: d['view_count'], reverse=True)
 
+    # Log response for debugging
+    logging.info(f"LEGACY get_videos endpoint returning {len(videos_json)} videos")
+    
     return jsonify({"videos": videos_json})
+
+# New, more semantically clear endpoint for user's own videos
+@videos_bp.route('/my', methods=['GET'])
+@login_required
+def get_my_videos():
+    """Get user's own videos with sorting options (MY VIDEOS section)"""
+    sort = request.args.get('sort')
+    
+    # Detailed logging for debugging
+    logging.info(f"get_my_videos called by user {current_user.username} with sort={sort}")
+    logging.info(f"User authenticated: {current_user.is_authenticated}, Admin: {current_user.is_admin if hasattr(current_user, 'is_admin') else 'N/A'}")
+    
+    try:
+        # SQLAlchemy 2.0 query pattern
+        # Return ALL videos regardless of privacy for the logged-in user's dashboard
+        if "views" in sort:
+            stmt = select(Video).join(VideoInfo)
+            videos = db.session.execute(stmt).scalars().all()
+        else:
+            stmt = select(Video).join(VideoInfo).order_by(text(sort))
+            videos = db.session.execute(stmt).scalars().all()
+
+        # Detailed logging of results for debugging
+        logging.info(f"Found {len(videos)} videos in database for My Videos")
+        
+        videos_json = []
+        for v in videos:
+            vjson = v.json()
+            vjson["view_count"] = VideoView.count(v.video_id)
+            videos_json.append(vjson)
+
+        if sort == "views asc":
+            videos_json = sorted(videos_json, key=lambda d: d['view_count'])
+        if sort == 'views desc':
+            videos_json = sorted(videos_json, key=lambda d: d['view_count'], reverse=True)
+
+        # Log response for debugging
+        logging.info(f"get_my_videos returning {len(videos_json)} videos")
+        
+        # Return expected format with videos array
+        return jsonify({"videos": videos_json})
+        
+    except Exception as e:
+        logging.error(f"Error in get_my_videos: {str(e)}", exc_info=True)
+        return jsonify({"videos": [], "error": str(e)})
 
 @videos_bp.route('/public', methods=['GET'])
 def get_public_videos():

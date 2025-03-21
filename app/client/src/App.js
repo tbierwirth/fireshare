@@ -1,7 +1,9 @@
 import React from 'react'
-import { Route, HashRouter as Router, Routes } from 'react-router-dom'
+import { Route, HashRouter as Router, Routes, Navigate } from 'react-router-dom'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
 import { CssBaseline } from '@mui/material'
+// eslint-disable-next-line no-unused-vars
+import Box from '@mui/material/Box' // Imported for potential future use
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import Login from './views/Login'
 import Register from './views/Register'
@@ -9,23 +11,51 @@ import Watch from './views/Watch'
 import Dashboard from './views/Dashboard'
 import NotFound from './views/NotFound'
 import Settings from './views/Settings'
-import UserSettings from './views/UserSettings'
+// eslint-disable-next-line no-unused-vars
+import UserSettings from './views/UserSettings' // Kept for future use
+import UserManagement from './views/UserManagement'
 import Feed from './views/Feed'
 import Games from './views/Games'
 import darkTheme from './common/darkTheme'
 import { getSetting } from './common/utils'
 import AuthWrapper from './components/utils/AuthWrapper'
 import Navbar20 from './components/nav/Navbar20'
-import { AuthProvider, ConfigProvider, VideoProvider } from './contexts'
+import { AuthProvider, ConfigProvider } from './contexts'
+import ErrorBoundary from './components/utils/ErrorBoundary'
 
-// Create a client
+// Create a client with enhanced error handling
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 5 * 60 * 1000, // 5 minutes
-      retry: 1,
+      cacheTime: 10 * 60 * 1000, // 10 minutes
+      retry: 1, // Only retry once
       refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
+      // Initialize with empty data to prevent UI flashes
+      placeholderData: (previousData) => previousData || undefined,
+      // Global error handler for all queries
+      onError: (error) => {
+        const status = error?.response?.status;
+        if (status === 401) {
+          // Handle unauthorized errors
+        } else if (status >= 500) {
+          // Handle server errors
+        }
+      }
     },
+    mutations: {
+      // Default mutation settings
+      retry: 0, // Don't retry mutations by default
+      onError: (error) => {
+        const status = error?.response?.status;
+        if (status === 401) {
+          // Handle unauthorized errors
+        } else if (status >= 500) {
+          // Handle server errors
+        }
+      }
+    }
   },
 });
 
@@ -38,30 +68,48 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <ConfigProvider>
-          <VideoProvider>
             <Router>
               <ThemeProvider theme={muitheme}>
                 <CssBaseline />
               <Routes>
+                {/* Public Videos Feed as the main homepage - available to all users */}
                 <Route
                   path="/"
                   element={
-                    <AuthWrapper redirect={'/feed'}>
+                    <AuthWrapper>
                       <Navbar20 page="/" collapsed={!drawerOpen} searchable styleToggle cardSlider>
-                        <Dashboard />
+                        {(props) => (
+                          <ErrorBoundary>
+                            <Feed key="feed-home" {...props} />
+                          </ErrorBoundary>
+                        )}
                       </Navbar20>
                     </AuthWrapper>
                   }
                 />
+                {/* My Videos - requires authentication */}
                 <Route
-                  path="/feed"
+                  path="/my/videos"
                   element={
-                    <AuthWrapper>
-                      <Navbar20 page="/feed" collapsed={!drawerOpen} searchable styleToggle cardSlider>
-                        <Feed />
+                    <AuthWrapper redirect="/login">
+                      <Navbar20 page="/my/videos" collapsed={!drawerOpen} searchable styleToggle cardSlider>
+                        {(props) => (
+                          <ErrorBoundary>
+                            <Dashboard key="dashboard" {...props} />
+                          </ErrorBoundary>
+                        )}
                       </Navbar20>
                     </AuthWrapper>
                   }
+                />
+                {/* Legacy routes that redirect to the new structure */}
+                <Route
+                  path="/my-videos"
+                  element={<Navigate to="/my/videos" replace />}
+                />
+                <Route
+                  path="/feed"
+                  element={<Navigate to="/" replace />}
                 />
                 <Route
                   path="/login"
@@ -86,7 +134,9 @@ export default function App() {
                   element={
                     <AuthWrapper>
                       <Navbar20 page="/games" collapsed={!drawerOpen}>
-                        <Games />
+                        <ErrorBoundary>
+                          <Games />
+                        </ErrorBoundary>
                       </Navbar20>
                     </AuthWrapper>
                   }
@@ -96,7 +146,9 @@ export default function App() {
                   element={
                     <AuthWrapper collapsed={!drawerOpen} redirect={'/login'}>
                       <Navbar20 page="/settings">
-                        <Settings />
+                        <ErrorBoundary>
+                          <Settings />
+                        </ErrorBoundary>
                       </Navbar20>
                     </AuthWrapper>
                   }
@@ -106,7 +158,9 @@ export default function App() {
                   element={
                     <AuthWrapper collapsed={!drawerOpen} redirect={'/login'}>
                       <Navbar20 page="/users">
-                        <UserSettings />
+                        <ErrorBoundary>
+                          <UserManagement />
+                        </ErrorBoundary>
                       </Navbar20>
                     </AuthWrapper>
                   }
@@ -116,7 +170,9 @@ export default function App() {
                   element={
                     <Navbar20 collapsed={true} toolbar page="/w">
                       <AuthWrapper>
-                        <Watch />
+                        <ErrorBoundary>
+                          <Watch />
+                        </ErrorBoundary>
                       </AuthWrapper>
                     </Navbar20>
                   }
@@ -132,7 +188,6 @@ export default function App() {
               </Routes>
             </ThemeProvider>
           </Router>
-        </VideoProvider>
       </ConfigProvider>
     </AuthProvider>
     </QueryClientProvider>
