@@ -280,8 +280,7 @@ function Navbar20({
     // Update React state with the new size
     setCardSize(newSize);
     
-    // Log for debugging
-    logger.info('Navbar20', `Card size updated: ${cardSize} → ${newSize}px`);
+    // Update completed silently
   }
 
   const DrawerControl = styled('div')(({ theme }) => ({

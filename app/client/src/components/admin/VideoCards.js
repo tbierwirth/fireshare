@@ -72,10 +72,7 @@ const VideoCards = ({
     // Use size or fallback to default
     const currentSize = size || 300;
     
-    // Log significant size changes
-    if (Math.abs((prevSizeRef.current || 0) - currentSize) > 5) {
-      logger.debug('VideoCards', `Card size changed: ${prevSizeRef.current || 'initial'} → ${currentSize}px`);
-    }
+    // Handle size changes silently
     
     // Update ref for future comparisons
     prevSizeRef.current = currentSize;
@@ -242,18 +239,7 @@ const VideoCards = ({
                     '0%': { opacity: 0 },
                     '100%': { opacity: 1 }
                   },
-                  // Add a visual indicator of the current size for debugging
-                  '&::before': process.env.NODE_ENV === 'development' ? {
-                    content: `"Card size: ${size || 300}px"`,
-                    display: 'block',
-                    width: '100%',
-                    textAlign: 'center',
-                    color: 'white',
-                    backgroundColor: 'rgba(0,0,0,0.5)',
-                    padding: '4px',
-                    marginBottom: '10px',
-                    borderRadius: '4px'
-                  } : {}
+                  // No debug display
                 }}
                 data-size={size || 300} // Add data attribute for easier debugging
               >

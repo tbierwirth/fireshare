@@ -45,8 +45,7 @@ const SliderWrapper = ({ cardSize, defaultCardSize, vertical, onChangeCommitted 
     // Apply the size change directly to the CSS variable
     document.documentElement.style.setProperty('--card-size', `${sizePx}px`);
     
-    // Log size changes for debugging
-    logger.debug('SliderWrapper', `Card size: ${sizePx}px`);
+    // Apply size change silently
   };
   
   // Handle slider release
@@ -57,8 +56,7 @@ const SliderWrapper = ({ cardSize, defaultCardSize, vertical, onChangeCommitted 
     // Save to localStorage for persistence
     localStorage.setItem('cardSize', finalSizePx.toString());
     
-    // Log the finalized size
-    logger.info('SliderWrapper', `Size adjustment complete: ${finalSizePx}px`);
+    // Commit the final size silently
     
     // Notify parent component of the change
     if (typeof onChangeCommitted === 'function') {
@@ -93,21 +91,7 @@ const SliderWrapper = ({ cardSize, defaultCardSize, vertical, onChangeCommitted 
 
   return (
     <Box sx={containerStyles}>
-      {/* Size indicator */}
-      <Tooltip title={`Current card width: ${currentSizePx}px`}>
-        <Box 
-          sx={{ 
-            position: 'absolute', 
-            top: vertical ? 'auto' : '-20px',
-            left: vertical ? '-20px' : 'auto',
-            fontSize: '12px',
-            color: '#999',
-            fontFamily: 'monospace'
-          }}
-        >
-          {currentSizePx}px
-        </Box>
-      </Tooltip>
+      {/* No size indicator */}
     
       {/* Zoom out button */}
       <Tooltip title="Smaller cards">
