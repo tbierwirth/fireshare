@@ -49,3 +49,213 @@ video {
     color: rgba(0, 219, 255, 1);
   }
 }
+
+/* Video card CSS transition styles */
+:root {
+  --card-size: 300px;
+  --card-transition-duration: 0.3s;
+  --card-gap: 16px;
+  --card-columns: 3;
+  --placeholder-color: rgba(0, 0, 0, 0.2);
+  --card-border-radius: 8px;
+  --card-resize-transition: width 0.3s ease-out, height 0.3s ease-out, flex-basis 0.3s ease-out;
+}
+
+/* Special class applied during resize operations */
+.resizing-cards {
+  --card-resize-transition: none !important;
+}
+
+/* Main grid container */
+.video-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--card-gap);
+  width: 100%;
+  padding: 16px;
+  justify-content: flex-start;
+  /* Make sure content appears immediately */
+  margin-bottom: 30px;
+  min-height: 250px;
+  position: relative;
+  /* Ensure all cards use the correct size */
+  --card-size: var(--card-size); /* Re-reference the variable to ensure it's inherited */
+}
+
+/* Individual card container */
+.video-card-container {
+  width: var(--card-size) !important;
+  height: calc(var(--card-size) * 0.5625) !important; /* Fixed 16:9 aspect ratio */
+  margin-bottom: var(--card-gap) !important;
+  flex: 0 0 auto !important;
+  flex-basis: var(--card-size) !important;
+  min-width: var(--card-size) !important;
+  max-width: var(--card-size) !important;
+  transition: var(--card-resize-transition) !important; /* Use the variable so we can disable transitions during slider operation */
+  will-change: width, height, transform !important; /* Optimize for GPU acceleration */
+  position: relative;
+  /* Force minimum size */
+  min-width: 160px !important;
+  min-height: 90px !important;
+  /* Force display */
+  display: block !important;
+  /* Z-index to ensure visibility */
+  z-index: 1 !important;
+  /* Debug outline */
+  outline: 1px solid rgba(255,255,255,0.05);
+  /* Force GPU rendering */
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+/* Remove transitions during resize operations */
+.resizing-cards .video-card-container {
+  transition: none !important;
+  animation: none !important;
+}
+
+/* Card inner content */
+.card-inner {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  border-radius: var(--card-border-radius);
+  overflow: hidden;
+  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  background-color: var(--placeholder-color);
+  /* Force visible content */
+  min-height: 100px;
+  display: block;
+}
+
+/* Slider active styles */
+.slider-active .MuiSlider-thumb {
+  box-shadow: 0 0 0 6px rgba(25, 118, 210, 0.16) !important;
+}
+
+.card-inner:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 6px 12px rgba(0,0,0,0.2);
+}
+
+/* Video image - absolute positioned to maintain aspect ratio */
+.video-card-image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  transition: none !important; /* Critical: remove transition to prevent image reloading */
+  will-change: transform; /* Optimize for GPU acceleration */
+  border-radius: 4px;
+  background-color: #000; /* Black background for images while loading */
+}
+
+/* Prevent any Material UI transitions from interfering */
+.MuiBox-root, .MuiPaper-root, .MuiGrid-root {
+  transition: none !important;
+}
+
+/* Only transition the specific properties we care about */
+.MuiBox-root.video-card-container,
+.MuiPaper-root.video-card-container,
+.MuiGrid-root.video-card-container {
+  transition: width var(--card-transition-duration) ease-in-out !important;
+}
+
+/* Ensure smooth slider thumb movement */
+.MuiSlider-thumb {
+  transition: left 0.1s linear !important;
+}
+
+/* Force hardware acceleration for smoother transitions */
+.video-card-container, .video-card-image {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Special handling during resize operations */
+.resizing-cards .video-card-image {
+  transition: none !important;
+  will-change: auto; /* Reduces memory usage during transitions */
+}
+
+/* Set a default value for card size in the root */
+:root {
+  --card-size: 300px; /* Default value if not set elsewhere */
+}
+
+/* Video card container styles - make sure dimensions respect the CSS variable */
+.video-card-container {
+  width: var(--card-size) !important;
+  height: calc(var(--card-size) * 0.5625) !important; /* 16:9 aspect ratio */
+  flex-basis: var(--card-size) !important;
+  min-width: var(--card-size) !important;
+  max-width: var(--card-size) !important;
+  transition: width 0.1s ease, height 0.1s ease;
+  margin-bottom: 16px;
+  display: block;
+}
+
+/* Video card image styles */
+.video-card-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  visibility: visible;
+}
+
+/* Force image display even during transitions */
+.video-card-image {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  z-index: 1 !important;
+  position: absolute !important;
+}
+
+/* Optimizations to prevent image flashing during card resize */
+.resizing-cards .video-card-image {
+  transition: none !important;
+  will-change: transform !important;
+  /* This will prevent new image requests during card size changes */
+  transform: translateZ(0) !important;
+  backface-visibility: hidden !important;
+}
+
+/* Only target card elements, not the entire page */
+.resizing-cards .video-card-container,
+.resizing-cards .card-inner {
+  transition: none !important;
+  animation: none !important;
+  will-change: width, height !important;
+}
+
+/* Force card content to stay visible during transitions */
+.resizing-cards .video-card-container {
+  visibility: visible !important;
+  opacity: 1 !important;
+  display: block !important;
+  overflow: hidden !important;
+}
+
+/* Responsive grid based on card size */
+@media (max-width: 600px) {
+  .video-grid {
+    justify-content: center;
+  }
+}
+
+/* Preserve image aspect ratio during transitions */
+.video-card-container * {
+  transition-property: none !important;
+}
+
+/* Apply transitions only to the container itself */
+.video-card-container {
+  transition-property: width, height !important;
+}

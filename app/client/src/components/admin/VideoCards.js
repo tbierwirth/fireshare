@@ -5,11 +5,13 @@ import VisibilityCard from './VisibilityCard'
 import VideoModal from '../modal/VideoModal'
 import SensorsIcon from '@mui/icons-material/Sensors'
 import { VideoService } from '../../services'
-import UploadCard from './UploadCard'
+// Removed UploadCard import since we're using the dedicated UploadButton instead
 // eslint-disable-next-line no-unused-vars
 import { TagDisplay } from '../tags'
 import { VideoListSkeleton } from '../utils/SkeletonLoader'
-import { useLoadingState, useOptimisticUI } from '../../hooks'
+import { useOptimisticUI } from '../../hooks'
+// Removed useLoadingState import since we're no longer using it
+import { logger } from '../../common/logger'
 
 // Session storage key to track if this component has shown videos before
 const SESSION_KEY_VIDEO_CARDS = 'component:videoCards:hasShownVideos'
@@ -22,11 +24,13 @@ const VideoCards = ({
   videos,
   loadingIcon = null,
   feedView = false,
-  showUploadCard = false,
   fetchVideos,
   authenticated,
-  size,
+  size, // Size in pixels for the cards
 }) => {
+  // REMOVED: We're now handling size changes in a single useEffect below
+  // Size prop is used for card dimensions
+  // Removed showUploadCard prop since we're using the dedicated UploadButton
   // Track local state
   const [vids, setVideos] = useState(videos || []);
   const [alert, setAlert] = useState({ open: false });
@@ -34,35 +38,85 @@ const VideoCards = ({
     open: false,
   });
   
-  // Use our custom loading state hook (manages minimum duration and debouncing)
-  const [isLoading, setIsLoading, isFirstLoad] = useLoadingState({
-    minDuration: 800,
-    initialState: true,
-    debounceToggles: true
-  });
+  // Loading state controlled directly through CSS transitions and forced rendering
+  // This variable is kept for API compatibility but not actively used
+  // eslint-disable-next-line no-unused-vars
+  const [isLoading, setIsLoading] = useState(false);
+  
+  // Process videos for display
+  
+  // Always force loading to false for rendering - this is critical to ensure content always renders
+  const actuallyIsLoading = false; // Force to false to ensure content always renders
+  
+  // Process videos data when it changes
+  useEffect(() => {
+    // Update local state when videos prop changes
+    if (videos) {
+      setVideos(Array.isArray(videos) ? videos : []);
+    }
+  }, [videos]);
   
   // Use our optimistic UI hook to track if videos have been shown before
-  const hadVideos = useOptimisticUI({
+  // This helps in deciding what to show during initial load
+  useOptimisticUI({
     key: SESSION_KEY_VIDEO_CARDS,
     data: videos,
     condition: (data) => Array.isArray(data) && data.length > 0
   });
   
-  // Update videos when the prop changes
+  // Reference to track previous size for change detection
+  const prevSizeRef = useRef(size);
+  
+  // Handle card size changes via CSS variables
   useEffect(() => {
-    // Update local state without transitions
-    setVideos(videos || []);
+    // Skip if size hasn't changed significantly
+    if (prevSizeRef.current === size) return;
     
-    // Signal that loading is complete after receiving videos
-    if (isLoading && videos) {
-      // Small delay to ensure smooth transition
-      const timer = setTimeout(() => {
-        setIsLoading(false);
-      }, 100);
-      
-      return () => clearTimeout(timer);
+    // Use size or fallback to default
+    const currentSize = size || 300;
+    
+    // Log significant size changes
+    if (Math.abs((prevSizeRef.current || 0) - currentSize) > 5) {
+      logger.debug('VideoCards', `Card size changed: ${prevSizeRef.current || 'initial'} → ${currentSize}px`);
     }
-  }, [videos, isLoading, setIsLoading]);
+    
+    // Update ref for future comparisons
+    prevSizeRef.current = currentSize;
+    
+    // For VideoCards component, we primarily rely on the CSS variable set by SliderWrapper
+    // This is just a fallback to ensure consistency
+    if (currentSize > 0) {
+      document.documentElement.style.setProperty('--card-size', `${currentSize}px`);
+    }
+  }, [size]);
+  
+  // CRITICAL FIX: Ensure the videos are always available and local state is updated
+  useEffect(() => {
+    if (!videos) return; // Skip if no videos yet
+    
+    // Update local state with videos and force loading to false
+    // No delay needed since we're using CSS transitions now
+    setVideos(Array.isArray(videos) ? videos : []);
+    setIsLoading(false);
+  }, [videos]); // IMPORTANT: Only depend on videos, not size or other props
+  
+  // Skip re-renders based on size changes - we handle size via direct DOM manipulation
+  const prevSizeStringRef = useRef(size?.toString());
+  useEffect(() => {
+    // Only process significant changes (> 5px difference)
+    const currentSizeStr = size?.toString();
+    const prevSizeStr = prevSizeStringRef.current;
+    
+    if (currentSizeStr !== prevSizeStr) {
+      if (Math.abs((size || 0) - (Number(prevSizeStr) || 0)) > 5) {
+        logger.debug('VideoCards', `Size changed significantly: ${prevSizeStr} → ${currentSizeStr}px`);
+        prevSizeStringRef.current = currentSizeStr;
+      } else {
+        // If change is small, don't log or process
+        prevSizeStringRef.current = currentSizeStr;
+      }
+    }
+  }, [size]); // We track size but don't use it to manipulate the DOM
 
   const openVideo = (id) => {
     setVideoModal({
@@ -143,17 +197,7 @@ const VideoCards = ({
         )}
         {loadingIcon}
       </Grid>
-      {!loadingIcon && (
-        <Grid container justifyContent="center">
-          <UploadCard
-            authenticated={authenticated}
-            feedView={feedView}
-            cardWidth={250}
-            handleAlert={memoizedHandleAlert}
-            publicUpload={feedView}
-          />
-        </Grid>
-      )}
+      {/* Upload card removed in favor of the dedicated Upload button */}
     </Paper>
   )
 
@@ -176,8 +220,8 @@ const VideoCards = ({
         {alert.message}
       </SnackbarAlert>
 
-      {/* Always show skeletons during loading */}
-      {isLoading && (
+      {/* Show placeholders only during first load with no videos */}
+      {actuallyIsLoading && !vids.length && (
         <Box>
           <VideoListSkeleton 
             count={6} 
@@ -186,45 +230,67 @@ const VideoCards = ({
         </Box>
       )}
       
-      {/* After loading is complete, show appropriate content */}
-      {!isLoading && (
+      {/* CRITICAL: Always render content, don't wait for loading state */}
+      {(
         <>
           {/* Show videos if available */}
           {vids && vids.length > 0 ? (
-            <Grid container justifyContent="center">
-              {showUploadCard && (
-                <UploadCard
-                  authenticated={authenticated}
-                  feedView={feedView}
-                  cardWidth={size}
-                  handleAlert={memoizedHandleAlert}
-                  fetchVideos={fetchVideos}
-                  publicUpload={feedView}
-                />
-              )}
-              {vids.map((v, index) => (
-                <Box
-                  key={v.path + v.video_id}
-                  sx={{ 
-                    opacity: 0,
-                    animation: `fadeIn 0.5s ease-in-out forwards ${index * 0.1}s`,
-                    '@keyframes fadeIn': {
-                      '0%': { opacity: 0, transform: 'translateY(10px)' },
-                      '100%': { opacity: 1, transform: 'translateY(0)' }
-                    }
-                  }}
-                >
-                  <VisibilityCard
-                    video={v}
-                    handleAlert={memoizedHandleAlert}
-                    openVideo={openVideo}
-                    cardWidth={size}
-                    authenticated={authenticated}
-                    deleted={handleDelete}
-                  />
-                </Box>
-              ))}
-            </Grid>
+            <>
+              {/* Upload card removed in favor of the dedicated Upload button */}
+              {/* Render video cards */}
+              
+              {/* SIMPLIFIED: Let cards flow naturally with flexbox for responsive layout */}
+              <Box 
+                className="video-grid"
+                sx={{ 
+                  animation: 'fadeIn 0.5s ease-in-out',
+                  '@keyframes fadeIn': {
+                    '0%': { opacity: 0 },
+                    '100%': { opacity: 1 }
+                  },
+                  // Add a visual indicator of the current size for debugging
+                  '&::before': process.env.NODE_ENV === 'development' ? {
+                    content: `"Card size: ${size || 300}px"`,
+                    display: 'block',
+                    width: '100%',
+                    textAlign: 'center',
+                    color: 'white',
+                    backgroundColor: 'rgba(0,0,0,0.5)',
+                    padding: '4px',
+                    marginBottom: '10px',
+                    borderRadius: '4px'
+                  } : {}
+                }}
+                data-size={size || 300} // Add data attribute for easier debugging
+              >
+                {vids.map((v, index) => (
+                  <Box 
+                    className="video-card-container"
+                    key={`video-card-${v.video_id}`}
+                    sx={{
+                      animation: `fadeInCard 0.4s ease-out forwards ${index * 0.03}s`,
+                      '@keyframes fadeInCard': {
+                        '0%': { opacity: 0, transform: 'translateY(8px)' },
+                        '100%': { opacity: 1, transform: 'translateY(0)' }
+                      },
+                      // Card sizing is controlled by CSS variables
+                      // and direct style application in the useEffect above
+                      outline: '1px solid rgba(255,255,255,0.1)',
+                    }}
+                  >
+                    <VisibilityCard
+                      video={v}
+                      handleAlert={memoizedHandleAlert}
+                      openVideo={openVideo}
+                      cardWidth="100%" // 100% of parent container (which is size px)
+                      // No explicit height - will be calculated based on video aspect ratio
+                      authenticated={authenticated}
+                      deleted={handleDelete}
+                    />
+                  </Box>
+                ))}
+              </Box>
+            </>
           ) : (
             /* Show empty state if no videos available */
             EMPTY_STATE()

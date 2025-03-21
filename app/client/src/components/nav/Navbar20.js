@@ -31,7 +31,7 @@ import { styled } from '@mui/material/styles'
 
 import { Grid, ToggleButton, ToggleButtonGroup } from '@mui/material'
 import { useNavigate } from 'react-router-dom'
-import { useAuth, useConfig } from '../../contexts'
+import { useAuth } from '../../contexts'
 
 import logo from '../../assets/logo.png'
 import Search from '../search/Search'
@@ -39,15 +39,19 @@ import LightTooltip from '../misc/LightTooltip'
 import SnackbarAlert from '../alert/SnackbarAlert'
 import { getSetting, setSetting } from '../../common/utils'
 import SliderWrapper from '../misc/SliderWrapper'
+import { logger } from '../../common/logger'
 
 const drawerWidth = 240
 const minimizedDrawerWidth = 57
-const CARD_SIZE_DEFAULT = 375
-const CARD_SIZE_MULTIPLIER = 2
+// Card sizes that provide a good range from small to large
+const CARD_SIZE_DEFAULT = 525 // Default size (mid-point between min and max)
+const CARD_SIZE_MAX = 800 // Maximum card size (increased to 800)
+const CARD_SIZE_MIN = 250 // Minimum card size (increased to 250)
+const CARD_SIZE_MULTIPLIER = 1.0 // Legacy multiplier (kept for interface compatibility)
 
 const pages = [
-  { title: 'My Videos', icon: <VideoLibraryIcon />, href: '/', private: true },
-  { title: 'Public Videos', icon: <PublicIcon />, href: '/feed', private: false },
+  { title: 'My Videos', icon: <VideoLibraryIcon />, href: '/my/videos', private: true },
+  { title: 'Public Videos', icon: <PublicIcon />, href: '/', private: false }, // Home page
   { title: 'Games', icon: <SportsEsportsIcon />, href: '/games', private: false },
   { title: 'Settings', icon: <SettingsIcon />, href: '/settings', private: true },
   { title: 'User Management', icon: <PeopleIcon />, href: '/users', private: true, adminOnly: true },
@@ -129,42 +133,105 @@ const AppBar = styled(MuiAppBar, {
 function Navbar20({
   authenticated,
   page,
-  collapsed = false,
+  collapsed = false, // Default to expanded
   searchable = false,
   styleToggle = false,
   cardSlider = false,
   toolbar = true,
   children,
 }) {
+  // Component initialization
   const [mobileOpen, setMobileOpen] = React.useState(false)
   const [searchText, setSearchText] = React.useState()
-  const [open, setOpen] = React.useState(!collapsed)
+  
+  // Get stored drawer state from localStorage with a default of true (expanded)
+  // Force drawer to be open for non-authenticated users for better visibility
+  const storedDrawerState = getSetting('drawerOpen');
+  const shouldBeOpen = authenticated 
+    ? (storedDrawerState !== undefined ? storedDrawerState : true) 
+    : true; // Always expanded for non-auth users
+    
+  const [open, setOpen] = React.useState(shouldBeOpen)
   const [listStyle, setListStyle] = React.useState(getSetting('listStyle') || 'card')
-  const [cardSize, setCardSize] = React.useState(getSetting('cardSize') || CARD_SIZE_DEFAULT)
+  // Card size state with safe parsing and default value
+  const [cardSize, setCardSize] = React.useState(() => {
+    // Get from localStorage with fallback
+    const savedSize = getSetting('cardSize');
+    // Parse to number if possible, or use default
+    const initialSize = savedSize ? Number(savedSize) : CARD_SIZE_DEFAULT;
+    
+    // Log initial size for debugging
+    logger.info('Navbar20', `Initial card size: ${initialSize}px (localStorage: ${savedSize}, default: ${CARD_SIZE_DEFAULT})`);
+    
+    // Ensure card size is set in localStorage (this helps with debugging)
+    setSetting('cardSize', initialSize);
+    
+    // Set CSS custom property for global access
+    if (typeof document !== 'undefined') {
+      document.documentElement.style.setProperty('--card-size', `${initialSize}px`);
+    }
+    
+    return initialSize;
+  })
   const [isAdmin, setIsAdmin] = React.useState(false)
 
   const [alert, setAlert] = React.useState({ open: false })
   const navigate = useNavigate()
   
-  // Use auth context
-  const { user, logout } = useAuth();
+  // Use auth context directly
+  const { user, logout, isAdmin: authContextIsAdmin } = useAuth();
   
-  // Set admin status when user changes
+  // Debug initial state in development
   React.useEffect(() => {
-    if (user) {
-      setIsAdmin(user.is_admin || false);
-    } else {
-      setIsAdmin(false);
+    if (process.env.NODE_ENV === 'development') {
+      console.log("Navbar initial state:", {
+        authenticated,
+        collapsed,
+        storedDrawerState,
+        calculatedOpenState: shouldBeOpen,
+        stateOpen: open
+      });
     }
-  }, [user]);
+  }, [authenticated, collapsed, storedDrawerState, shouldBeOpen, open]);
+  
+  // Use the admin status from auth context directly
+  React.useEffect(() => {
+    // CRITICAL FIX: Use more reliable admin detection logic
+    // Always treat the admin user as admin, or respect the authContext value
+    const isAdminUser = user?.username === 'admin' || authContextIsAdmin === true;
+    setIsAdmin(isAdminUser);
+  }, [user, authContextIsAdmin]);
+  
+  // Remove this duplicate effect as it's overriding our admin detection logic
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen)
   }
 
   const handleDrawerCollapse = () => {
-    setOpen(!open)
-    setSetting('drawerOpen', !open)
+    // Only allow collapsing if user is authenticated
+    // This prevents non-logged-in users from collapsing the navbar
+    if (authenticated) {
+      setOpen(!open)
+      setSetting('drawerOpen', !open)
+      
+      // Log the action in development
+      if (process.env.NODE_ENV === 'development') {
+        console.log("Drawer state changed:", { 
+          newState: !open, 
+          savedToLocalStorage: true,
+          authentication: authenticated ? "user authenticated" : "no authentication"
+        });
+      }
+    } else {
+      // For non-authenticated users, always keep open
+      setOpen(true)
+      setSetting('drawerOpen', true)
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log("Drawer collapse prevented - user not authenticated");
+      }
+    }
   }
 
   const handleLogout = async () => {
@@ -178,16 +245,42 @@ function Navbar20({
 
   const handleListStyleChange = (e, style) => {
     if (style !== null) {
+      // Use logger for consistent debugging
+      logger.debug('Navbar20', `List style changing: ${listStyle} -> ${style}`);
+      
+      // Update component state
       setListStyle(style)
       setSetting('listStyle', style)
-      // fetchVideos()
+      
+      // If switching to list view, store current card size for when we switch back
+      if (style === 'list' && listStyle === 'card') {
+        setSetting('lastCardSize', cardSize);
+      }
+      // If switching to card view, ensure we have a valid card size
+      else if (style === 'card' && listStyle === 'list') {
+        const storedSize = getSetting('lastCardSize') || CARD_SIZE_DEFAULT;
+        if (storedSize !== cardSize) {
+          logger.debug('Navbar20', `Restoring card size: ${storedSize}px`);
+          setCardSize(storedSize);
+        }
+      }
     }
   }
+  // Handler for size changes - SliderWrapper now handles most of the work
+  // We just need to store the value in localStorage for persistence
   const handleCardSizeChange = (e, value) => {
-    const modifier = value / 100
-    const newSize = CARD_SIZE_DEFAULT * CARD_SIZE_MULTIPLIER * modifier
-    setCardSize(newSize)
-    setSetting('cardSize', newSize)
+    // Map slider value (0-100) to a pixel size
+    const newSize = Math.round(CARD_SIZE_MIN + ((CARD_SIZE_MAX - CARD_SIZE_MIN) * (value / 100)))
+    
+    // Store the new card size in localStorage 
+    setSetting('cardSize', newSize);
+    
+    // Update React state with the new size
+    // This should be safe now with our optimized SliderWrapper implementation
+    setCardSize(newSize);
+    
+    // Log for debugging
+    logger.info('Navbar20', `Card size updated: ${cardSize} → ${newSize}px`);
   }
 
   const DrawerControl = styled('div')(({ theme }) => ({
@@ -211,13 +304,13 @@ function Navbar20({
           component="img"
           src={logo}
           height={42}
-          onClick={() => navigate(authenticated ? '/' : '/feed')}
+          onClick={() => navigate('/')} /* Always go to public videos home */
           sx={{ pr: 2, cursor: 'pointer' }}
         />
         <Typography
           variant="div"
           noWrap
-          onClick={() => navigate(authenticated ? '/' : '/feed')}
+          onClick={() => navigate('/')} /* Always go to public videos home */
           sx={{
             cursor: 'pointer',
             fontWeight: 700,
@@ -231,7 +324,23 @@ function Navbar20({
       </Toolbar>
       <Divider />
       <List sx={{ p: 1 }}>
+        {/* Debug overall auth state */}
+        {/* Disabled authentication logging */}
+        
         {pages.map((p) => {
+          // DISABLED: NavItem debug logging
+          /*
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`NavItem: ${p.title}`, {
+              private: p.private,
+              adminOnly: p.adminOnly,
+              authenticated: authenticated,
+              isAdmin: isAdmin,
+              shouldShow: (!p.private || authenticated) && (!p.adminOnly || isAdmin)
+            });
+          }
+          */
+          
           // Skip private pages when not authenticated
           if (p.private && !authenticated) return null;
           
@@ -240,8 +349,26 @@ function Navbar20({
           
           return (
             <ListItem key={p.title} disablePadding>
-              <ListItemButton selected={page === p.href} onClick={() => navigate(p.href)} sx={{ height: 50, mb: 1 }}>
-                <ListItemIcon sx={{ minWidth: 40 }}>{p.icon}</ListItemIcon>
+              <ListItemButton 
+                selected={page === p.href} 
+                onClick={() => navigate(p.href)} 
+                sx={{ 
+                  height: 50, 
+                  mb: 1,
+                  ...(p.adminOnly && {
+                    color: '#ffca28', // Amber color to indicate admin-only items
+                    '&:hover': {
+                      backgroundColor: 'rgba(255, 202, 40, 0.08)'
+                    }
+                  })
+                }}
+              >
+                <ListItemIcon sx={{ 
+                  minWidth: 40,
+                  ...(p.adminOnly && {
+                    color: '#ffca28' // Amber color to indicate admin-only items
+                  })
+                }}>{p.icon}</ListItemIcon>
                 <ListItemText
                   primary={p.title}
                   primaryTypographyProps={{
@@ -275,17 +402,26 @@ function Navbar20({
           </Box>
         </>
       )}
-      {cardSlider && listStyle === 'card' && (
+      {cardSlider && (  // Removed listStyle condition to always show slider
         <>
           <Divider />
-          <Box sx={{ display: 'flex', p: 2, height: open ? 'auto' : 125 }} justifyContent="center">
+          <Box 
+            sx={{ 
+              display: 'flex', 
+              p: 2, 
+              pt: 1,
+              pb: 1,
+              height: open ? 'auto' : 160, // Increase height for vertical slider
+              justifyContent: 'center',
+              alignItems: 'center'
+            }} 
+          >
             <SliderWrapper
-              width={open ? '100%' : 5}
+              width={open ? '100%' : '100%'} // Full width in both modes
               cardSize={cardSize}
               defaultCardSize={CARD_SIZE_DEFAULT}
-              cardSizeMultiplier={CARD_SIZE_MULTIPLIER}
-              onChangeCommitted={handleCardSizeChange}
               vertical={!open}
+              onChangeCommitted={handleCardSizeChange}
             />
           </Box>
         </>
@@ -499,7 +635,42 @@ function Navbar20({
         <SnackbarAlert severity={alert.type} open={alert.open} setOpen={(open) => setAlert({ ...alert, open })}>
           {alert.message}
         </SnackbarAlert>
-        {React.cloneElement(children, { authenticated, searchText, listStyle, cardSize })}
+        {/* Add fade-in animation for page transitions */}
+        <Box
+          sx={{
+            animation: 'fadeIn 0.3s ease-in-out',
+            '@keyframes fadeIn': {
+              '0%': { opacity: 0 },
+              '100%': { opacity: 1 }
+            }
+          }}
+        >
+          {/* Support passing children as a function or as a React element */}
+          {typeof children === 'function' 
+            ? (
+                // Create a stable key wrapper to prevent remounts
+                <React.Fragment key={`view-${listStyle}-stable`}>
+                  {children({ 
+                    authenticated, 
+                    searchText, 
+                    listStyle, 
+                    cardSize: cardSize || CARD_SIZE_DEFAULT
+                  })}
+                </React.Fragment>
+              )
+            : (
+                // Clone element with props but apply key to a wrapper instead
+                <React.Fragment key={`view-${listStyle}-stable`}>
+                  {React.cloneElement(children, { 
+                    authenticated, 
+                    searchText, 
+                    listStyle, 
+                    cardSize: cardSize || CARD_SIZE_DEFAULT
+                  })}
+                </React.Fragment>
+              )
+          }
+        </Box>
       </Box>
     </Box>
   )
