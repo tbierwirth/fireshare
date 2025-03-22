@@ -2,16 +2,6 @@ import React from 'react';
 import { Box, Chip, Typography } from '@mui/material';
 import LabelIcon from '@mui/icons-material/Label';
 
-/**
- * Component to display tags
- * @param {Object} props
- * @param {Array} props.tags - Tags to display
- * @param {boolean} props.clickable - Whether tags are clickable
- * @param {Function} props.onTagClick - Callback when a tag is clicked
- * @param {Object} props.sx - Additional styles
- * @param {number} props.max - Maximum number of tags to display
- * @param {boolean} props.showCount - Whether to show count of hidden tags
- */
 const TagDisplay = ({ 
   tags = [], 
   clickable = false, 

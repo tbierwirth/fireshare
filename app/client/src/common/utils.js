@@ -45,25 +45,25 @@ export const useDebounce = (value, delay) => {
   return debouncedValue
 }
 
-// Debugging component wrapper for monitoring render cycles
+
 export function withTiming(Component) {
   const WrappedComponent = React.forwardRef((props, ref) => {
     const componentName = Component.displayName || Component.name || 'Component';
     const renderCount = React.useRef(0);
     
-    // Increment render count and log
+    
     renderCount.current += 1;
     
     console.log(`[${new Date().toISOString()}] ${componentName} rendering (count: ${renderCount.current})`);
     console.time(`${componentName} render #${renderCount.current}`);
     
-    // Add additional debug info to props
+    
     const enhancedProps = {
       ...props,
       _debugRenderCount: renderCount.current
     };
     
-    // Record component state for debugging
+    
     React.useEffect(() => {
       console.log(`[${new Date().toISOString()}] ${componentName} state:`, enhancedProps);
       
@@ -72,32 +72,32 @@ export function withTiming(Component) {
       };
     }, []);
     
-    // Render the component
+    
     const result = <Component {...enhancedProps} ref={ref} />;
     console.timeEnd(`${componentName} render #${renderCount.current}`);
     
     return result;
   });
   
-  // Preserve displayName for React DevTools
+  
   WrappedComponent.displayName = `withTiming(${Component.displayName || Component.name || 'Component'})`;
   
   return WrappedComponent;
 }
 
-// Hook for tracking state changes for debugging
+
 export function useTrackedState(initialState, debugName) {
   const [state, setState] = React.useState(initialState);
   const stateRef = React.useRef(initialState);
   const updateCount = React.useRef(0);
   const componentName = debugName || 'Component';
   
-  // Wrapper for setState that logs changes
+  
   const setTrackedState = React.useCallback((newState) => {
     updateCount.current += 1;
     const count = updateCount.current;
     
-    // Handle function updates
+    
     const resolvedNewState = typeof newState === 'function' 
       ? newState(stateRef.current) 
       : newState;
@@ -118,7 +118,7 @@ export function useTrackedState(initialState, debugName) {
         : 'Simple value change'
     });
     
-    // Update the ref before the actual state
+    
     stateRef.current = resolvedNewState;
     setState(resolvedNewState);
   }, [componentName]);
@@ -126,7 +126,7 @@ export function useTrackedState(initialState, debugName) {
   return [state, setTrackedState];
 }
 
-// Enhanced cache utility with in-flight request tracking
+
 const pendingRequests = {};
 
 export const cache = {
@@ -159,22 +159,22 @@ export const cache = {
     }
   },
   
-  // Check if there's an in-flight request for this key
+  
   isRequestPending: (key) => {
     return !!pendingRequests[key];
   },
   
-  // Register a pending request
+  
   registerRequest: (key, promise) => {
     pendingRequests[key] = promise;
-    // Clean up when the promise resolves or rejects
+    
     promise.finally(() => {
       delete pendingRequests[key];
     });
     return promise;
   },
   
-  // Get pending request if it exists
+  
   getPendingRequest: (key) => {
     return pendingRequests[key];
   }
@@ -206,16 +206,16 @@ export const toHHMMSS = (secs) => {
 }
 
 export const copyToClipboard = (textToCopy) => {
-  // navigator clipboard api needs a secure context (https)
+  
   if (navigator.clipboard && window.isSecureContext) {
-    // navigator clipboard api method'
+    
     return navigator.clipboard.writeText(textToCopy)
   } else {
     console.log('test')
-    // text area method
+    
     let textArea = document.createElement('textarea')
     textArea.value = textToCopy
-    // make the textarea out of viewport
+    
     textArea.style.position = 'fixed'
     textArea.style.left = '-999999px'
     textArea.style.top = '-999999px'
@@ -223,7 +223,7 @@ export const copyToClipboard = (textToCopy) => {
     textArea.focus()
     textArea.select()
     return new Promise((res, rej) => {
-      // here the magic happens
+      
       document.execCommand('copy') ? res() : rej()
       textArea.remove()
     })

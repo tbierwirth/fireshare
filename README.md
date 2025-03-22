@@ -151,7 +151,22 @@ Connect Fireshare to a central user directory and keep user access organised.
 
 # Installation
 
-Fireshare is meant to run within a Docker environment. While we reccommend using something like Docker Compose it is not required and can run with a simple `docker run` command.
+Fireshare is meant to run within a Docker environment. While we recommend using something like Docker Compose it is not required and can run with a simple `docker run` command.
+
+## Production Deployment
+
+For detailed production deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
+
+Quick Start:
+```bash
+# Create directories for persistent storage
+sudo mkdir -p /opt/fireshare/{data,processed,videos}
+sudo chown -R 1000:1000 /opt/fireshare
+sudo chmod -R 755 /opt/fireshare
+
+# Deploy with Docker Compose
+docker-compose up -d
+```
 
 Fireshare needs 3 volume mounts.
 

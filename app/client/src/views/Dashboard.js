@@ -8,8 +8,8 @@ import { getSetting, setSetting } from '../common/utils'
 import Select from 'react-select'
 import SnackbarAlert from '../components/alert/SnackbarAlert'
 import { useVideos as useVideosQuery, useVideoCache } from '../services/VideoQueryHooks'
-// VideoContext removed - using direct React Query hooks
-// eslint-disable-next-line no-unused-vars
+
+
 import { VideoListSkeleton } from '../components/utils/SkeletonLoader'
 import { useOptimisticUI } from '../hooks'
 import { logger } from '../common/logger'
@@ -18,36 +18,36 @@ import selectFolderTheme from '../common/reactSelectFolderTheme'
 import selectSortTheme from '../common/reactSelectSortTheme'
 import { SORT_OPTIONS } from '../common/constants'
 
-// Converting folders for select input
+
 const createSelectFolders = (folders) => {
   return folders.map((f) => ({ value: f, label: f }))
 }
 
-// Session key for tracking if dashboard has shown videos before
+
 const SESSION_KEY_DASHBOARD = 'route:dashboard:hasVideos'
 
-// Dashboard component - will be memoized using React.memo at export
+
 const Dashboard = ({ authenticated = false, searchText, cardSize, listStyle, user }) => {
-  // This component is explicitly for showing user's own videos (aka "My Videos")
-  // Default authenticate to false to prevent API calls when not set
   
-  // CRITICAL: Log props received by Dashboard - this helps us debug prop passing
+  
+  
+  
   useEffect(() => {
     logger.info('Dashboard', `Dashboard received props: cardSize=${cardSize}, listStyle=${listStyle}`);
     
-    // Update CSS variable in document root - this is critical for slider to work
+    
     if (cardSize) {
       document.documentElement.style.setProperty('--card-size', `${cardSize}px`);
       logger.info('Dashboard', `Updated CSS variable --card-size to ${cardSize}px`);
     }
   }, [cardSize, listStyle]);
   
-  // Direct React Query hook usage (VideoContext removed)
+  
   const { refreshVideos } = useVideoCache();
   
-  // Direct use of props is simpler and more maintainable
   
-  // Local state
+  
+  
   const [selectedFolder, setSelectedFolder] = useState(
     getSetting('folder') || { value: 'All Videos', label: 'All Videos' },
   )
@@ -68,28 +68,28 @@ const Dashboard = ({ authenticated = false, searchText, cardSize, listStyle, use
     refetch 
   } = useVideosQuery({ // This uses the /api/videos/my endpoint for authenticated user's videos
     sortOrder: selectedSort.value,
-    // CRITICAL FIX: Pass authentication status to prevent API calls when not authenticated
+    
     isAuthenticated: authenticated,
-    // This options object is passed to the React Query hook
+    
     options: {
-      // Keep previous data while fetching to prevent flashing
+      
       keepPreviousData: true,
-      // Don't refetch on window focus to reduce API calls
+      
       refetchOnWindowFocus: false,
-      // Don't auto-refetch periodically
+      
       refetchInterval: false,
-      // Only refetch on mount if query cache is empty
+      
       refetchOnMount: "if-empty",
-      // Keep data fresh longer to reduce fetches
-      staleTime: 60000, // 1 minute
-      // Reduce retries
+      
+      staleTime: 60000, 
+      
       retry: 1,
-      retryDelay: 1000, // 1 second between retries
+      retryDelay: 1000, 
       onSuccess: (data) => {
-        // We now rely on React Query to manage data state correctly
+        
         const videos = data?.data?.videos || [];
         if (videos.length > 0) {
-          // Store success in session for optimistic UI
+          
           sessionStorage.setItem(SESSION_KEY_DASHBOARD, 'true');
         }
       },
@@ -103,30 +103,25 @@ const Dashboard = ({ authenticated = false, searchText, cardSize, listStyle, use
     }
   });
   
-  // CRITICAL FIX: Never set loading to true to ensure content is always rendered
+  
   useEffect(() => {
-    // Force loading to false regardless of query state
+    
     setIsLoading(false);
   }, [queryLoading, isFetching, videosResponse, setIsLoading]);
   
-  // Initial fetch reference to prevent duplicate fetches
+  
   const initialFetchRef = React.useRef(false);
   
-  // Perform a single fetch when the component mounts
+  
   useEffect(() => {
-    // Force fetch regardless of authenticated state - the API handles auth check
-    // This addresses issues with auth state not being properly detected
+    
+    
     if (!initialFetchRef.current) {
       initialFetchRef.current = true;
       
-      // DISABLED: Fetch logging
-      /*
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Dashboard performing fetch of user videos, auth status:', authenticated);
-      }
-      */
       
-      // Always attempt to fetch videos - the API will return empty if not authenticated
+            
+      
       refetch().catch(err => {
         if (process.env.NODE_ENV === 'development') {
           console.error('Error fetching videos:', err);
@@ -140,9 +135,9 @@ const Dashboard = ({ authenticated = false, searchText, cardSize, listStyle, use
     }
   }, [refetch, authenticated, setAlert]);
   
-  // CRITICAL: Always ensure isLoading is false
+  
   useEffect(() => {
-    // Force loading state to false no matter what
+    
     const timer = setTimeout(() => {
       setIsLoading(false);
     }, 200);
@@ -150,9 +145,9 @@ const Dashboard = ({ authenticated = false, searchText, cardSize, listStyle, use
     return () => clearTimeout(timer);
   }, [setIsLoading]);
   
-  // Extract videos from response
+  
   const videos = useMemo(() => {
-    // Handle different response formats
+    
     if (videosResponse?.data?.videos) {
       return videosResponse.data.videos;
     } else if (Array.isArray(videosResponse?.data)) {
@@ -161,26 +156,26 @@ const Dashboard = ({ authenticated = false, searchText, cardSize, listStyle, use
       return videosResponse;
     }
     
-    // Default case - return empty array
+    
     return [];
   }, [videosResponse]);
   
-  // Use optimistic UI hook to track if videos have been shown before
-  // eslint-disable-next-line no-unused-vars
+  
+  
   const hadVideos = useOptimisticUI({
     key: SESSION_KEY_DASHBOARD,
     data: videos,
     condition: (data) => Array.isArray(data) && data.length > 0
   });
   
-  // Update search when prop changes
+  
   React.useEffect(() => {
     if (searchText !== search) {
       setSearch(searchText);
     }
   }, [searchText, search]);
   
-  // Handle error alerts
+  
   React.useEffect(() => {
     if (isError && error) {
       setAlert({
@@ -191,7 +186,7 @@ const Dashboard = ({ authenticated = false, searchText, cardSize, listStyle, use
     }
   }, [isError, error]);
   
-  // Process folders from videos
+  
   const folders = useMemo(() => {
     if (!videos || videos.length === 0) {
       return ['All Videos'];
@@ -200,9 +195,9 @@ const Dashboard = ({ authenticated = false, searchText, cardSize, listStyle, use
     const tfolders = [];
     const gameSet = new Set();
     
-    // Extract folder info from videos
+    
     videos.forEach((v) => {
-      // Path folders
+      
       const split = v.path
         .split('/')
         .slice(0, -1)
@@ -222,7 +217,7 @@ const Dashboard = ({ authenticated = false, searchText, cardSize, listStyle, use
     tfolders.sort((a, b) => (a.toLowerCase() > b.toLowerCase() ? 1 : -1));
     tfolders.unshift('All Videos');
     
-    // Add games section
+    
     if (gameSet.size > 0) {
       tfolders.push('--- Games ---');
       const gameArray = Array.from(gameSet);
@@ -235,23 +230,23 @@ const Dashboard = ({ authenticated = false, searchText, cardSize, listStyle, use
     return tfolders;
   }, [videos]);
   
-  // Function to refresh videos
+  
   const fetchVideos = useCallback(() => {
-    // Log only in development
+    
     if (process.env.NODE_ENV === 'development') {
       console.log("Manual refresh of user videos triggered");
     }
     
-    // Use our refreshVideos function that handles all caching
+    
     refreshVideos();
     
-    // Also directly refetch the specific query
+    
     refetch();
   }, [refreshVideos, refetch]);
   
-  // Handle folder selection
+  
   const handleFolderSelection = useCallback((folder) => {
-    // Skip if separator is clicked
+    
     if (folder.value === '--- Games ---') {
       return;
     }
@@ -260,14 +255,14 @@ const Dashboard = ({ authenticated = false, searchText, cardSize, listStyle, use
     setSelectedFolder(folder)
   }, []);
   
-  // Handle sort selection
+  
   const handleSortSelection = useCallback((sortOption) => {
     setSetting('sortOption', sortOption)
     setSelectedSort(sortOption)
-    // The query will automatically refetch with the new sort parameter
+    
   }, []);
   
-  // Filter videos by search text
+  
   const filteredVideos = useMemo(() => {
     if (!videos || videos.length === 0) {
       return [];
@@ -282,7 +277,7 @@ const Dashboard = ({ authenticated = false, searchText, cardSize, listStyle, use
     });
   }, [videos, search]);
   
-  // Filter videos by folder
+  
   const displayVideos = useMemo(() => {
     if (!filteredVideos || filteredVideos.length === 0) {
       return [];
@@ -293,7 +288,7 @@ const Dashboard = ({ authenticated = false, searchText, cardSize, listStyle, use
     } else if (selectedFolder.value.startsWith('🎮 ')) {
       return filteredVideos.filter((v) => v.game === selectedFolder.value.substring(3));
     } else {
-      // Path-based filtering
+      
       return filteredVideos.filter((v) => {
         return v.path
           .split('/')
@@ -351,7 +346,7 @@ const Dashboard = ({ authenticated = false, searchText, cardSize, listStyle, use
                 {isFetching ? "Refreshing..." : "Refresh Videos"}
               </Button>
               
-              {/* Always show upload button on My Videos page */}
+              {}
               <UploadButton onSuccess={(result) => {
                 if (result) {
                   setAlert({
@@ -359,22 +354,22 @@ const Dashboard = ({ authenticated = false, searchText, cardSize, listStyle, use
                     message: result.message,
                     open: true
                   });
-                  // Refresh videos after successful upload
+                  
                   if (result.type === 'success') {
-                    // Make sure to refresh all video caches
+                    
                     refreshVideos();
-                    // Also refresh the current component
+                    
                     fetchVideos();
                   }
                 }
               }} />
             </Box>
             
-            {/* Main content area with improved loading states */}
+            {}
             <Box>
-              {/* CRITICAL FIX: Always render videos regardless of loading state */}
+              {}
               
-              {/* Error state */}
+              {}
               {isError && (
                 <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10, flexDirection: 'column', alignItems: 'center' }}>
                   <Typography variant="h6" color="error" sx={{ mb: 2 }}>
@@ -386,15 +381,15 @@ const Dashboard = ({ authenticated = false, searchText, cardSize, listStyle, use
                 </Box>
               )}
               
-              {/* Never show skeletons - this prevents the placeholder issue */}
+              {}
               
-              {/* ALWAYS try to show videos if we have them */}
+              {}
               {!isError && (
                 <>
-                  {/* Always try to show videos if available */}
+                  {}
                   {displayVideos && displayVideos.length > 0 ? (
                     <>
-                      {/* Video display - list style */}
+                      {}
                       {listStyle === 'list' ? (
                         <VideoList
                           authenticated={authenticated}
@@ -402,21 +397,20 @@ const Dashboard = ({ authenticated = false, searchText, cardSize, listStyle, use
                           videos={displayVideos}
                         />
                       ) : (
-                        // Video display - card style
+                        
                         <VideoCards
                           authenticated={authenticated}
                           loadingIcon={isFetching ? <LoadingSpinner size={20} /> : null}
                           size={cardSize} 
                           fetchVideos={fetchVideos}
                           videos={displayVideos}
-                          // Only change key when videos change, not when cardSize changes
+                          
                           key={`videocards-${displayVideos.length}`}
                         />
                       )}
                     </>
                   ) : (
-                    /* Show empty state if no videos */
-                    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10, flexDirection: 'column', alignItems: 'center' }}>
+                                        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10, flexDirection: 'column', alignItems: 'center' }}>
                       <Typography variant="h6" color="text.secondary" sx={{ mb: 2 }}>
                         No videos found
                       </Typography>
@@ -440,15 +434,15 @@ const Dashboard = ({ authenticated = false, searchText, cardSize, listStyle, use
   );
 }
 
-// Custom comparison function for React.memo 
+
 const dashboardPropsAreEqual = (prevProps, nextProps) => {
-  // Always re-render when these change
+  
   if (prevProps.authenticated !== nextProps.authenticated) return false;
   if (prevProps.searchText !== nextProps.searchText) return false;
   if (prevProps.listStyle !== nextProps.listStyle) return false;
   
-  // Card size changes are handled via direct DOM manipulation
-  // so we don't need to re-render the whole component
+  
+  
   return true;
 };
 

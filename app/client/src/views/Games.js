@@ -108,7 +108,7 @@ const Games = () => {
   };
 
   const handleGameClick = (game) => {
-    // Navigate to feed view filtered by this game
+    
     navigate(`/feed?game=${encodeURIComponent(game.name)}`);
   };
 

@@ -13,7 +13,7 @@ const Search = ({ searchHandler, placeholder, sx }) => {
     <Box {...sx}>
       <TextField
         size="small"
-        // variant="standard"
+        
         fullWidth
         placeholder={placeholder}
         onChange={(e) => setSearch(e.target.value)}

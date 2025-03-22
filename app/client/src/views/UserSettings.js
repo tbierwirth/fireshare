@@ -12,7 +12,7 @@ import UserManager from '../components/admin/UserManager';
 import InviteManager from '../components/admin/InviteManager';
 import { AuthService } from '../services';
 
-// Tab panel component
+
 function TabPanel(props) {
   const { children, value, index, ...other } = props;
 

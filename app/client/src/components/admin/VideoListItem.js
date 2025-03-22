@@ -76,7 +76,7 @@ const VideoListItem = ({ video, openVideoHandler, alertHandler, authenticated, d
     if (debouncedTitle && debouncedTitle !== title) {
       update()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [debouncedTitle])
 
   const handleMouseDown = (e) => {
@@ -118,7 +118,7 @@ const VideoListItem = ({ video, openVideoHandler, alertHandler, authenticated, d
     <div ref={nodeRef}>
       {!isVisible && (
         <div
-          // calculate the rendered cards height based on the video dimesions and our css styling heights
+          
           style={{
             width: '100%',
             background: '#000e393b',

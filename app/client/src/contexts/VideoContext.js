@@ -10,10 +10,10 @@ import {
   useVideoCache
 } from '../services/VideoQueryHooks';
 
-// Create video context
+
 const VideoContext = createContext();
 
-// Custom hook to use the video context
+
 export const useVideos = () => {
   const context = useContext(VideoContext);
   if (!context) {
@@ -22,11 +22,11 @@ export const useVideos = () => {
   return context;
 };
 
-// Provider component that wraps the app and makes video data available
+
 export const VideoProvider = ({ children }) => {
   const queryClient = useQueryClient();
   
-  // State for backward compatibility
+  
   const [videos, setVideos] = useState([]);
   const [publicVideos, setPublicVideos] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -35,19 +35,19 @@ export const VideoProvider = ({ children }) => {
   const [tags, setTags] = useState([]);
   const [folders, setFolders] = useState([]);
   
-  // Track if videos have been loaded at least once (for UI stability)
+  
   const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
   const [hasInitiallyLoadedPublic, setHasInitiallyLoadedPublic] = useState(false);
   
-  // Session storage keys for tracking routes with videos
+  
   const SESSION_KEY_VIDEOS = 'route:videos:hasVideos';
   const SESSION_KEY_PUBLIC_VIDEOS = 'route:publicVideos:hasVideos';
   
-  // Use React Query for videos data with default sort
+  
   const videosQuery = useVideosQuery({
     sortOrder: 'updated_at desc',
     options: {
-      // When videos are successfully loaded, update our state and session tracking
+      
       onSuccess: (res) => {
         const newVideos = res?.data?.videos || [];
         console.log('Videos loaded:', newVideos.length);
@@ -62,23 +62,23 @@ export const VideoProvider = ({ children }) => {
         setError(err?.response?.data || 'Failed to fetch videos');
         setHasInitiallyLoaded(true);
       },
-      // Retry more times for data fetching
+      
       retry: 3,
       retryDelay: 1000,
-      // Keep previous data during refetches
+      
       keepPreviousData: true,
-      // Ensure consistent loading behavior
+      
       refetchOnWindowFocus: true,
       refetchOnMount: true,
-      staleTime: 60000 // 1 minute
+      staleTime: 60000 
     }
   });
   
-  // Use React Query for public videos with default sort
+  
   const publicVideosQuery = usePublicVideos({
     sortOrder: 'updated_at desc',
     options: {
-      // When public videos are successfully loaded, update our state and session tracking
+      
       onSuccess: (res) => {
         const newVideos = res?.data?.videos || [];
         console.log('Public videos loaded:', newVideos.length, res);
@@ -93,19 +93,19 @@ export const VideoProvider = ({ children }) => {
         setError(err?.response?.data || 'Failed to fetch public videos');
         setHasInitiallyLoadedPublic(true);
       },
-      // Retry more times for data fetching
+      
       retry: 3,
       retryDelay: 1000,
-      // Keep previous data during refetches
+      
       keepPreviousData: true,
-      // Ensure consistent loading behavior 
+      
       refetchOnWindowFocus: true,
       refetchOnMount: true,
-      staleTime: 60000 // 1 minute
+      staleTime: 60000 
     }
   });
   
-  // Use React Query for games with proper array keys
+  
   const gamesQuery = useGamesQuery('');
   
   // Use React Query for tags with proper array keys
@@ -153,22 +153,22 @@ export const VideoProvider = ({ children }) => {
   
   // Legacy method with React Query integration
   const getVideos = useCallback(async (sort = 'updated_at desc', useCache = true) => {
-    // If sort order is different from default, fetch with that specific key
+    
     const result = await queryClient.fetchQuery({
       queryKey: ['videos', sort],
       queryFn: () => VideoService.getVideos(sort),
       staleTime: 5 * 60 * 1000,
-      // Use cached data if available and allowed
+      
       ...(!useCache ? { cacheTime: 0 } : {})
     });
     
     const newVideos = result?.data?.videos || [];
     setVideos(newVideos);
     
-    // Track that we've loaded videos at least once
+    
     setHasInitiallyLoaded(true);
     
-    // If videos were found, update session storage
+    
     if (newVideos.length > 0) {
       sessionStorage.setItem(SESSION_KEY_VIDEOS, 'true');
     }
@@ -176,24 +176,24 @@ export const VideoProvider = ({ children }) => {
     return newVideos;
   }, [queryClient]);
   
-  // Legacy method with React Query integration
+  
   const getPublicVideos = useCallback(async (sort = 'updated_at desc', useCache = true) => {
-    // If sort order is different from default, fetch with that specific key
+    
     const result = await queryClient.fetchQuery({
       queryKey: ['publicVideos', sort],
       queryFn: () => VideoService.getPublicVideos(sort),
       staleTime: 5 * 60 * 1000,
-      // Use cached data if available and allowed
+      
       ...(!useCache ? { cacheTime: 0 } : {})
     });
     
     const newVideos = result?.data?.videos || [];
     setPublicVideos(newVideos);
     
-    // Track that we've loaded public videos at least once
+    
     setHasInitiallyLoadedPublic(true);
     
-    // If videos were found, update session storage
+    
     if (newVideos.length > 0) {
       sessionStorage.setItem(SESSION_KEY_PUBLIC_VIDEOS, 'true');
     }
@@ -201,9 +201,9 @@ export const VideoProvider = ({ children }) => {
     return newVideos;
   }, [queryClient]);
   
-  // Legacy method with React Query integration
+  
   const getGames = useCallback(async (useCache = true) => {
-    // Fetch games using React Query
+    
     const result = await queryClient.fetchQuery({
       queryKey: ['games', ''],
       queryFn: () => VideoService.getGames(),
@@ -240,7 +240,7 @@ export const VideoProvider = ({ children }) => {
       queryKey: ['folders'],
       queryFn: () => VideoService.getFolders(),
       staleTime: 15 * 60 * 1000,
-      // Use cached data if available and allowed
+      
       ...(!useCache ? { cacheTime: 0 } : {})
     });
     
@@ -249,17 +249,17 @@ export const VideoProvider = ({ children }) => {
     return newFolders;
   }, [queryClient]);
   
-  // Use our new hook for cache invalidation
+  
   const { refreshVideos } = useVideoCache();
   
-  // Enhanced cache invalidation using the new hook
+  
   const invalidateVideoCache = useCallback(() => {
     console.log("Invalidating video cache in VideoContext (using refreshVideos hook)");
     
-    // Use our shared refreshVideos function
+    
     refreshVideos();
     
-    // Additional force refetch for this context's queries for backward compatibility
+    
     videosQuery.refetch();
     publicVideosQuery.refetch();
     gamesQuery.refetch();
@@ -267,7 +267,7 @@ export const VideoProvider = ({ children }) => {
     foldersQuery.refetch();
   }, [refreshVideos, videosQuery, publicVideosQuery, gamesQuery, tagsQuery, foldersQuery]);
   
-  // Add video view with React Query mutation support
+  
   const addVideoView = useCallback(async (videoId) => {
     try {
       await VideoService.addView(videoId);
@@ -276,9 +276,9 @@ export const VideoProvider = ({ children }) => {
     }
   }, []);
   
-  // Create enhanced context value that combines React Query with backward compatibility
+  
   const videoContextValue = {
-    // State values
+    
     videos,
     publicVideos,
     isLoading,
@@ -287,17 +287,17 @@ export const VideoProvider = ({ children }) => {
     tags,
     folders,
     
-    // Extra query state for enhanced components
+    
     isVideosRefetching: videosQuery.isFetching,
     isPublicVideosRefetching: publicVideosQuery.isFetching,
     hasInitiallyLoaded,
     hasInitiallyLoadedPublic,
     
-    // Route history helpers for optimistic UI
+    
     hasPreviouslyLoadedVideos: () => sessionStorage.getItem(SESSION_KEY_VIDEOS) === 'true',
     hasPreviouslyLoadedPublicVideos: () => sessionStorage.getItem(SESSION_KEY_PUBLIC_VIDEOS) === 'true',
     
-    // Methods
+    
     getVideos,
     getPublicVideos,
     getGames,
@@ -306,7 +306,7 @@ export const VideoProvider = ({ children }) => {
     invalidateVideoCache,
     addVideoView,
     
-    // Allow direct access to React Query for components that want it
+    
     queryClient,
     videosQuery,
     publicVideosQuery,
@@ -315,29 +315,29 @@ export const VideoProvider = ({ children }) => {
     foldersQuery
   };
   
-  // Prefetch important data on context initialization
+  
   useEffect(() => {
-    // Pre-populate query cache with empty arrays to prevent null states
+    
     queryClient.setQueryData(['videos', 'updated_at desc'], { data: { videos: [] } });
     queryClient.setQueryData(['publicVideos', 'updated_at desc'], { data: { videos: [] } });
     queryClient.setQueryData(['games', ''], { data: { games: [] } });
     queryClient.setQueryData(['tags', ''], { data: { tags: [] } });
     queryClient.setQueryData(['folders'], { data: { folders: [] } });
     
-    // Check if we've previously loaded videos on any route
+    
     const previouslyHadVideos = sessionStorage.getItem(SESSION_KEY_VIDEOS) === 'true';
     const previouslyHadPublicVideos = sessionStorage.getItem(SESSION_KEY_PUBLIC_VIDEOS) === 'true';
     
-    // Use this knowledge to inform our initial loading state
+    
     setHasInitiallyLoaded(previouslyHadVideos);
     setHasInitiallyLoadedPublic(previouslyHadPublicVideos);
     
-    // Enable automatic refetch on window focus for main queries
+    
     queryClient.setDefaultOptions({
       queries: {
         refetchOnWindowFocus: true,
         refetchOnReconnect: true,
-        staleTime: 30000, // Consider data stale after 30 seconds
+        staleTime: 30000, 
       },
     });
   }, [queryClient]);

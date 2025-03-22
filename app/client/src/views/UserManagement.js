@@ -9,7 +9,7 @@ const UserManagement = () => {
   const [tabValue, setTabValue] = React.useState(0);
   const { isAdmin, user } = useAuth();
 
-  // Log detailed information about admin status
+  
   console.log('UserManagement View - Auth status:', { 
     isAdmin, 
     user,

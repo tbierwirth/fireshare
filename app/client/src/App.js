@@ -2,8 +2,8 @@ import React from 'react'
 import { Route, HashRouter as Router, Routes, Navigate } from 'react-router-dom'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
 import { CssBaseline } from '@mui/material'
-// eslint-disable-next-line no-unused-vars
-import Box from '@mui/material/Box' // Imported for potential future use
+
+import Box from '@mui/material/Box' 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import Login from './views/Login'
 import Register from './views/Register'
@@ -11,8 +11,8 @@ import Watch from './views/Watch'
 import Dashboard from './views/Dashboard'
 import NotFound from './views/NotFound'
 import Settings from './views/Settings'
-// eslint-disable-next-line no-unused-vars
-import UserSettings from './views/UserSettings' // Kept for future use
+
+import UserSettings from './views/UserSettings' 
 import UserManagement from './views/UserManagement'
 import Feed from './views/Feed'
 import Games from './views/Games'
@@ -23,36 +23,36 @@ import Navbar20 from './components/nav/Navbar20'
 import { AuthProvider, ConfigProvider } from './contexts'
 import ErrorBoundary from './components/utils/ErrorBoundary'
 
-// Create a client with enhanced error handling
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      cacheTime: 10 * 60 * 1000, // 10 minutes
-      retry: 1, // Only retry once
+      staleTime: 5 * 60 * 1000, 
+      cacheTime: 10 * 60 * 1000, 
+      retry: 1, 
       refetchOnWindowFocus: false,
       refetchOnReconnect: true,
-      // Initialize with empty data to prevent UI flashes
+      
       placeholderData: (previousData) => previousData || undefined,
-      // Global error handler for all queries
+      
       onError: (error) => {
         const status = error?.response?.status;
         if (status === 401) {
-          // Handle unauthorized errors
+          
         } else if (status >= 500) {
-          // Handle server errors
+          
         }
       }
     },
     mutations: {
-      // Default mutation settings
-      retry: 0, // Don't retry mutations by default
+      
+      retry: 0, 
       onError: (error) => {
         const status = error?.response?.status;
         if (status === 401) {
-          // Handle unauthorized errors
+          
         } else if (status >= 500) {
-          // Handle server errors
+          
         }
       }
     }
@@ -72,7 +72,7 @@ export default function App() {
               <ThemeProvider theme={muitheme}>
                 <CssBaseline />
               <Routes>
-                {/* Public Videos Feed as the main homepage - available to all users */}
+                {}
                 <Route
                   path="/"
                   element={
@@ -87,7 +87,7 @@ export default function App() {
                     </AuthWrapper>
                   }
                 />
-                {/* My Videos - requires authentication */}
+                {}
                 <Route
                   path="/my/videos"
                   element={
@@ -102,7 +102,7 @@ export default function App() {
                     </AuthWrapper>
                   }
                 />
-                {/* Legacy routes that redirect to the new structure */}
+                {}
                 <Route
                   path="/my-videos"
                   element={<Navigate to="/my/videos" replace />}

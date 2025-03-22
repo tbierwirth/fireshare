@@ -23,7 +23,7 @@ class User(UserMixin, db.Model):
     display_name = db.Column(db.String(100), nullable=True)
     role = db.Column(db.String(20), default=UserRole.USER.value)
     status = db.Column(db.String(20), default=UserStatus.ACTIVE.value)
-    admin = db.Column(db.Boolean, default=False)  # Keeping for backward compatibility
+    admin = db.Column(db.Boolean, default=False)  
     ldap = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
@@ -90,12 +90,12 @@ class Game(db.Model):
     __tablename__ = "game"
     
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)  # Original display name with proper casing
-    slug = db.Column(db.String(100), nullable=False, unique=True, index=True)  # Lowercase, slugified version for matching
+    name = db.Column(db.String(100), nullable=False)  
+    slug = db.Column(db.String(100), nullable=False, unique=True, index=True)  
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
     
-    # Relationships
+    
     folder = db.relationship('Folder', backref='game', uselist=False)
     videos = db.relationship('Video', backref=db.backref('game', lazy=True))
     
@@ -104,17 +104,17 @@ class Game(db.Model):
     
     @classmethod
     def generate_slug(cls, name):
-        """Create a slug from the name"""
-        # Convert to lowercase and replace spaces with hyphens
-        # Allow alphanumeric, hyphens, periods and underscores in slugs
+        
+        
+        
         return re.sub(r'[^a-z0-9\-\._]', '', name.lower().replace(' ', '-'))
     
     @classmethod
     def find_or_create(cls, name):
-        """Find a game by name (case insensitive) or create a new one"""
+        
         slug = cls.generate_slug(name)
         
-        # SQLAlchemy 2.0 query pattern
+        
         stmt = select(cls).filter_by(slug=slug)
         game = db.session.execute(stmt).scalar_one_or_none()
         
@@ -123,27 +123,27 @@ class Game(db.Model):
             db.session.add(game)
             db.session.commit()
             
-            # Create a folder for this game
+            
             Folder.for_game(game)
             
         return game
     
     def json(self):
-        # Simple default implementation - no dynamic counting
+        
         return {
             "id": self.id,
             "name": self.name,
             "slug": self.slug,
             "folder_id": self.folder.id if self.folder else None,
-            "video_count": 0  # Default to 0, will be calculated separately if needed
+            "video_count": 0  
         }
 
 class Tag(db.Model):
     __tablename__ = "tag"
     
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)  # Original display name with proper casing
-    slug = db.Column(db.String(100), nullable=False, unique=True, index=True)  # Lowercase, slugified version for matching
+    name = db.Column(db.String(100), nullable=False)  
+    slug = db.Column(db.String(100), nullable=False, unique=True, index=True)  
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
     
@@ -152,17 +152,17 @@ class Tag(db.Model):
     
     @classmethod
     def generate_slug(cls, name):
-        """Create a slug from the name"""
-        # Convert to lowercase and replace spaces with hyphens
-        # Allow alphanumeric, hyphens, periods and underscores in slugs
+        
+        
+        
         return re.sub(r'[^a-z0-9\-\._]', '', name.lower().replace(' ', '-'))
     
     @classmethod
     def find_or_create(cls, name):
-        """Find a tag by name (case insensitive) or create a new one"""
+        
         slug = cls.generate_slug(name)
         
-        # SQLAlchemy 2.0 query pattern
+        
         stmt = select(cls).filter_by(slug=slug)
         tag = db.session.execute(stmt).scalar_one_or_none()
         
@@ -173,12 +173,12 @@ class Tag(db.Model):
         return tag
     
     def json(self):
-        # Simple default implementation - no dynamic counting
+        
         return {
             "id": self.id,
             "name": self.name,
             "slug": self.slug,
-            "video_count": 0  # Default to 0, will be calculated separately if needed
+            "video_count": 0  
         }
 
 class Folder(db.Model):
@@ -191,11 +191,11 @@ class Folder(db.Model):
     parent_id = db.Column(db.Integer, db.ForeignKey('folder.id'), nullable=True)
     tag_id = db.Column(db.Integer, db.ForeignKey('tag.id'), nullable=True, unique=True)
     game_id = db.Column(db.Integer, db.ForeignKey('game.id'), nullable=True, unique=True)
-    folder_type = db.Column(db.String(20), default="tag")  # 'tag', 'game', or 'custom'
+    folder_type = db.Column(db.String(20), default="tag")  
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
     
-    # Relationships
+    
     parent = db.relationship('Folder', remote_side=[id], backref=db.backref('children', lazy='dynamic'))
     videos = db.relationship('Video', backref=db.backref('folder', lazy=True), foreign_keys="[Video.folder_id]")
     
@@ -204,10 +204,10 @@ class Folder(db.Model):
     
     @classmethod
     def for_tag(cls, tag_name):
-        """Get or create a folder for a tag"""
+        
         tag = Tag.find_or_create(tag_name)
         
-        # SQLAlchemy 2.0 query pattern
+        
         stmt = select(cls).filter_by(tag_id=tag.id)
         folder = db.session.execute(stmt).scalar_one_or_none()
         
@@ -225,8 +225,8 @@ class Folder(db.Model):
     
     @classmethod
     def for_game(cls, game):
-        """Get or create a folder for a game"""
-        # SQLAlchemy 2.0 query pattern
+        
+        
         stmt = select(cls).filter_by(game_id=game.id)
         folder = db.session.execute(stmt).scalar_one_or_none()
         
@@ -254,10 +254,10 @@ class Folder(db.Model):
             "game": self.game.name if hasattr(self, 'game') and self.game else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
-            "video_count": 0  # This will be calculated separately in the API endpoints
+            "video_count": 0  
         }
 
-# Association table for the many-to-many relationship between videos and tags
+
 video_tags = db.Table('video_tags',
     db.Column('video_id', db.String(32), db.ForeignKey('video.video_id'), primary_key=True),
     db.Column('tag_id', db.Integer, db.ForeignKey('tag.id'), primary_key=True),
@@ -275,39 +275,39 @@ class Video(db.Model):
     created_at = db.Column(db.DateTime(), default=datetime.datetime.utcnow)
     updated_at = db.Column(db.DateTime(), default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
     
-    # Required game for organization
-    game_id = db.Column(db.Integer, db.ForeignKey('game.id'), nullable=True)  # Nullable for backward compatibility
     
-    # Folder and owner
+    game_id = db.Column(db.Integer, db.ForeignKey('game.id'), nullable=True)  
+    
+    
     folder_id = db.Column(db.Integer, db.ForeignKey('folder.id'), nullable=True)
     owner_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     
-    # Relationships
+    
     info = db.relationship("VideoInfo", back_populates="video", uselist=False, lazy="joined")
     owner = db.relationship('User', backref=db.backref('videos', lazy='dynamic'))
     tags = db.relationship('Tag', secondary=video_tags, backref=db.backref('videos', lazy='dynamic'))
     
     def set_game(self, game_name):
-        """Set the game for this video and create/assign to the corresponding folder"""
+        
         import logging
         logger = logging.getLogger('fireshare')
         
         logger.info(f"Setting game for video {self.video_id} to '{game_name}'")
         
-        # Avoid detached instance error by working with fresh database objects
-        # and explicit SQL updates instead of ORM operations on potentially detached objects
         
-        # First get or create the game
+        
+        
+        
         game = Game.find_or_create(game_name)
         logger.info(f"Game found/created with ID: {game.id}, name: {game.name}")
         
-        # Create the folder for the game if needed
+        
         folder = Folder.for_game(game)
         logger.info(f"Folder for game: {folder.id} - {folder.name}")
         
-        # Use a direct SQL update to avoid detached instance errors
+        
         try:
-            # Update the video with the game_id and folder_id - SQLAlchemy 2.0 pattern
+            
             stmt = update(Video).where(Video.video_id == self.video_id).values(
                 game_id=game.id, 
                 folder_id=folder.id
@@ -315,16 +315,16 @@ class Video(db.Model):
             db.session.execute(stmt)
             logger.info(f"Explicitly updated video {self.video_id} with game_id={game.id} and folder_id={folder.id}")
             
-            # Commit the changes
+            
             db.session.commit()
             logger.info(f"Changes committed for video {self.video_id}")
             
-            # Update the instance attributes to reflect the database changes
-            # (important for code that might access self.game_id after this method returns)
+            
+            
             self.game_id = game.id
             self.folder_id = folder.id
             
-            # Verify the update worked - SQLAlchemy 2.0 pattern
+            
             stmt = select(Video).filter_by(video_id=self.video_id)
             video = db.session.execute(stmt).scalar_one_or_none()
             logger.info(f"After commit, video {video.video_id} has game_id={video.game_id}")
@@ -336,20 +336,20 @@ class Video(db.Model):
             raise e
     
     def add_tag(self, tag_name):
-        """Add a tag to the video (pure categorization, doesn't affect folder)"""
+        
         import logging
         logger = logging.getLogger('fireshare')
         
         logger.info(f"Adding tag '{tag_name}' to video {self.video_id}")
         
-        # Avoid detached instance error by working with explicit SQL operations
+        
         try:
-            # First get or create the tag
+            
             tag = Tag.find_or_create(tag_name)
             logger.info(f"Tag found/created with ID: {tag.id}, name: {tag.name}")
             
-            # Check if this video already has this tag by querying the association table directly
-            # SQLAlchemy 2.0 query pattern
+            
+            
             stmt = select(video_tags).where(
                 (video_tags.c.video_id == self.video_id) & 
                 (video_tags.c.tag_id == tag.id)
@@ -357,10 +357,10 @@ class Video(db.Model):
             existing = db.session.execute(stmt).first()
             
             if not existing:
-                # If the tag is not already associated, create the association
+                
                 logger.info(f"Adding association between video {self.video_id} and tag {tag.name}")
                 
-                # Insert directly into the association table
+                
                 stmt = video_tags.insert().values(
                     video_id=self.video_id,
                     tag_id=tag.id
@@ -463,13 +463,13 @@ class VideoView(db.Model):
 
     @classmethod
     def count(cls, video_id):
-        # SQLAlchemy 2.0 query pattern
+        
         stmt = select(func.count()).select_from(cls).filter_by(video_id=video_id)
         return db.session.execute(stmt).scalar_one()
 
     @classmethod
     def add_view(cls, video_id, ip_address):
-        # SQLAlchemy 2.0 query pattern
+        
         stmt = select(cls).filter_by(video_id=video_id, ip_address=ip_address)
         exists = db.session.execute(stmt).scalar_one_or_none()
         

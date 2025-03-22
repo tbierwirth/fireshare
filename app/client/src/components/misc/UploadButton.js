@@ -6,12 +6,8 @@ import { TagInput } from '../tags'
 import SimpleGameSelector from './SimpleGameSelector'
 import { useAuth } from '../../contexts/AuthContext'
 
-/**
- * Upload Button component that handles file selection and upload
- * Uses the existing tag/game selection workflow
- */
 const UploadButton = ({ onSuccess }) => {
-  // Get authentication status
+  
   const { isLoggedIn } = useAuth()
   
   const [selectedFile, setSelectedFile] = React.useState(null)
@@ -69,7 +65,7 @@ const UploadButton = ({ onSuccess }) => {
     formData.append('file', selectedFile)
     formData.append('game', selectedGame)
     
-    // Add tags to form data
+    
     if (selectedTags && selectedTags.length > 0) {
       selectedTags.forEach(tag => {
         formData.append('tags[]', tag)
@@ -77,12 +73,12 @@ const UploadButton = ({ onSuccess }) => {
     }
 
     try {
-      // Use the appropriate upload endpoint based on auth status
+      
       if (isLoggedIn) {
-        // Use authenticated upload endpoint when logged in
+        
         await VideoService.upload(formData, uploadProgress)
       } else {
-        // Use public upload endpoint when not logged in
+        
         await VideoService.publicUpload(formData, uploadProgress)
       }
       
@@ -111,7 +107,7 @@ const UploadButton = ({ onSuccess }) => {
       }
     }
     
-    // Reset file input
+    
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
@@ -128,7 +124,7 @@ const UploadButton = ({ onSuccess }) => {
         onChange={handleFileSelect}
       />
 
-      {/* Upload button */}
+      {}
       <Button
         variant="contained"
         color="primary"
@@ -139,7 +135,7 @@ const UploadButton = ({ onSuccess }) => {
         {isLoggedIn ? "Upload My Clip" : "Upload New Clip"}
       </Button>
 
-      {/* Game/Tag selection dialog */}
+      {}
       <Dialog open={showDialog} onClose={handleDialogClose} maxWidth="sm" fullWidth>
         <DialogTitle>
           {uploading ? `Uploading... ${Math.round(progress * 100)}%` : 'Categorize Your Video'}
@@ -173,7 +169,7 @@ const UploadButton = ({ onSuccess }) => {
                 Please select the game this video is from and add any additional tags.
               </Typography>
               
-              {/* Game Selection (Required) */}
+              {}
               <SimpleGameSelector 
                 initialGame={selectedGame || ''}
                 onChange={(game) => setSelectedGame(game || '')}

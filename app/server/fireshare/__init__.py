@@ -19,7 +19,7 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 
-# init SQLAlchemy so we can use it later in our models
+
 db = SQLAlchemy()
 migrate = Migrate()
 
@@ -28,16 +28,16 @@ def update_config(path):
     def combine(dict1, dict2):
         for key in dict2:
             if key in dict1:
-                if isinstance(dict1[key], list): # If value is a list, we want special logic
-                    if isinstance(dict2[key], list): # if the "input" is a list, just do list + list
+                if isinstance(dict1[key], list): 
+                    if isinstance(dict2[key], list): 
                         dict1[key] = dict1[key] + dict2[key]
                     else:
                         dict1[key].append(dict2[key])
-                elif isinstance(dict1[key], dict): # calling itself recursively
+                elif isinstance(dict1[key], dict): 
                     dict1[key] = combine(dict1[key], dict2[key])
-                else: # Overwrites all other values
+                else: 
                     dict1[key] = dict2[key]
-            else: # Creates the values that doesn't exist.
+            else: 
                 dict1[key] = dict2[key]
         return dict1
 
@@ -136,16 +136,16 @@ def create_app(init_schedule=False):
     def load_user(user_id):
         return User.query.get(int(user_id))
 
-    # blueprint for auth routes in our app
+    
     from .auth import auth as auth_blueprint
     app.register_blueprint(auth_blueprint)
 
-    # Blueprint for API routes
-    # The API has been restructured into a modular organization by resource type
+    
+    
     from .api import api as api_blueprint
     app.register_blueprint(api_blueprint)
 
-    # blueprint for non-auth parts of app
+    
     from .main import main as main_blueprint
     app.register_blueprint(main_blueprint)
 
@@ -155,5 +155,5 @@ def create_app(init_schedule=False):
             app.config['MINUTES_BETWEEN_VIDEO_SCANS'])
 
     with app.app_context():
-        # db.create_all()
+        
         return app

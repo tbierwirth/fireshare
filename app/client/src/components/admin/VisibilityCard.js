@@ -14,9 +14,6 @@ import { useAuth } from '../../contexts/AuthContext'
 const URL = getUrl()
 const PURL = getPublicWatchUrl()
 
-/**
- * Completely rewritten VisibilityCard with direct DOM rendering
- */
 const VisibilityCard = ({ 
   video, 
   openVideo, 
@@ -25,13 +22,13 @@ const VisibilityCard = ({
   deleted,
   feedView = false
 }) => {
-  // Get auth context to check if user is admin
+  
   const { isAdmin } = useAuth()
   
-  // Local state for modal and visibility
+  
   const [detailsModalOpen, setDetailsModalOpen] = useState(false)
   const nodeRef = useRef()
-  useIsVisible(nodeRef) // Keep the hook call to avoid breaking changes
+  useIsVisible(nodeRef) 
   const [privateView, setPrivateView] = useState(video.info?.private)
   
   const handleViewClick = (e) => {
@@ -39,7 +36,7 @@ const VisibilityCard = ({
     openVideo(video.video_id)
   }
 
-  // Directly copy the URL when clicked
+  
   const handleCopyLink = (e) => {
     e.stopPropagation()
     handleAlert({
@@ -49,21 +46,21 @@ const VisibilityCard = ({
     })
   }
   
-  // Toggle video visibility
+  
   const handleToggleVisibility = async (e) => {
     e.stopPropagation()
     try {
       await VideoService.updatePrivacy(video.video_id, !privateView)
       setPrivateView(!privateView)
       
-      // Show success message
+      
       handleAlert({
         type: privateView ? 'info' : 'warning',
         message: privateView ? `Added to your public feed` : `Removed from your public feed`,
         open: true,
       })
       
-      // Update parent component if needed through a callback
+      
       if (typeof video.handleUpdate === 'function') {
         video.handleUpdate({ id: video.video_id, private: !privateView })
       }
@@ -77,18 +74,18 @@ const VisibilityCard = ({
     }
   }
   
-  // Handle modal close with update handling
+  
   const handleDetailsModalClose = (update) => {
     setDetailsModalOpen(false)
     
     if (update) {
       if (update === 'delete') {
-        // Call delete handler if provided
+        
         if (typeof deleted === 'function') {
           deleted(video.video_id)
         }
       } else {
-        // Update local state if needed (currently not required)
+        
       }
     }
   }
@@ -123,7 +120,7 @@ const VisibilityCard = ({
           }
         }}
       >
-      {/* Title bar */}
+      {}
       <ButtonGroup
         variant="contained"
         size="small"
@@ -135,7 +132,7 @@ const VisibilityCard = ({
           '.MuiButtonGroup-grouped:not(:last-of-type)': {
             border: 'none',
           },
-          // Remove any default border styling
+          
           '& .MuiButtonGroup-grouped': {
             borderRight: 'none',
             borderLeft: 'none',
@@ -175,12 +172,12 @@ const VisibilityCard = ({
             lineHeight: '36px',
             fontSize: '14px',
             border: 'none',
-            minWidth: 0 // Ensure text can shrink properly
+            minWidth: 0 
           }}
         >
           {video.info?.title || "No Title"}
         </Typography>
-        {/* Only show visibility toggle if admin AND not in feed view, or if it's your own video */}
+        {}
         {(isAdmin || (authenticated && !feedView)) && (
           <Button
             edge="end"
@@ -202,18 +199,18 @@ const VisibilityCard = ({
         )}
       </ButtonGroup>
 
-      {/* Content area */}
+      {}
       <Box
         sx={{
           position: 'relative',
           width: '100% !important',
-          pt: '56.25% !important', // 16:9 aspect ratio
+          pt: '56.25% !important', 
           backgroundColor: '#222',
           overflow: 'hidden',
-          height: '0 !important', // Force aspect ratio through padding-top and height:0
+          height: '0 !important', 
         }}
       >
-        {/* Video ID placeholder */}
+        {}
         <Box
           sx={{
             position: 'absolute',
@@ -229,7 +226,7 @@ const VisibilityCard = ({
           {video.video_id.substring(0, 10)}
         </Box>
 
-        {/* Actual poster image - with stable cache key to prevent reloading */}
+        {}
         <img
           src={`${URL}/api/video/poster?id=${video.video_id}`}
           alt={video.info?.title || "Video thumbnail"}
@@ -245,7 +242,7 @@ const VisibilityCard = ({
           loading="eager"
         />
 
-        {/* Copy link button */}
+        {}
         <Box sx={{ position: 'absolute', bottom: 3, left: 3, zIndex: 3 }}>
           <CopyToClipboard text={`${PURL}${video.video_id}`}>
             <IconButton
@@ -264,7 +261,7 @@ const VisibilityCard = ({
           </CopyToClipboard>
         </Box>
 
-        {/* Duration info */}
+        {}
         <Box sx={{ position: 'absolute', bottom: 39, right: 3, zIndex: 3 }}>
           <Typography
             variant="div"
@@ -282,7 +279,7 @@ const VisibilityCard = ({
           </Typography>
         </Box>
 
-        {/* View count */}
+        {}
         <Box sx={{ position: 'absolute', bottom: 14, right: 3, zIndex: 3 }}>
           <Typography
             variant="div"

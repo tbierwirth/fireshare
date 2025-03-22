@@ -7,16 +7,12 @@ from fireshare import logger
 import time
 
 def lock_exists(path: Path):
-    """
-    Checks if a lockfile currently exists
-    """
+    
     lockfile = path / "fireshare.lock"
     return lockfile.exists()
 
 def create_lock(path: Path):
-    """
-    Creates the lock file
-    """
+    
     lockfile = path / "fireshare.lock"
     if not lockfile.exists():
         logger.debug(f"A lockfile has been created at {str(lockfile)}")
@@ -24,18 +20,14 @@ def create_lock(path: Path):
         fp.close()
 
 def remove_lock(path: Path):
-    """
-    Deletes the lock file
-    """
+    
     lockfile = path / "fireshare.lock"
     if lockfile.exists():
         logger.debug(f"A lockfile has been removed at {str(lockfile)}")
         os.remove(lockfile)
 
 def video_id(path: Path, mb=16):
-    """
-    Calculates the id of a video by using xxhash on the first 16mb (or the whole file if it's less than that)
-    """
+    
     with path.open('rb', 0) as f:
         file_header = f.read(int(1024*1024*mb))
     return xxhash.xxh3_128_hexdigest(file_header)
@@ -68,10 +60,10 @@ def transcode_video(video_path, out_path):
     logger.info(f'Transcoded {str(out_path)} in {e-s}s')
 
 def create_boomerang_preview(video_path, out_path, clip_duration=1.5):
-    # https://stackoverflow.com/questions/65874316/trim-a-video-and-add-the-boomerang-effect-on-it-with-ffmpeg
-    # https://ffmpeg.org/ffmpeg-filters.html#reverse
-    # https://ffmpeg.org/ffmpeg-filters.html#Examples-148
-    # ffmpeg -ss 0 -t 1.5 -i in.mp4 -y -filter_complex "[0]split[a][b];[b]reverse[a_rev];[a][a_rev]concat[clip];[clip]scale=-1:720" -an out.mp4
+    
+    
+    
+    
     s = time.time()
     boomerang_filter_720p = '[0]split[a][b];[b]reverse[a_rev];[a][a_rev]concat[clip];[clip]scale=-1:720'
     boomerang_filter_480p = '[0]split[a][b];[b]reverse[a_rev];[a][a_rev]concat[clip];[clip]scale=-1:480'

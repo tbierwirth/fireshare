@@ -9,43 +9,39 @@ import UploadCard from './UploadCard'
 import { VideoListSkeleton } from '../utils/SkeletonLoader'
 import { useLoadingState, useOptimisticUI } from '../../hooks'
 
-// Session storage key to track if this component has shown videos before
+
 const SESSION_KEY_VIDEO_LIST = 'component:videoList:hasShownVideos'
 
-/**
- * Enhanced VideoList component with improved loading state management
- * using custom hooks for smoother transitions
- */
 const VideoList = ({ videos, loadingIcon = null, feedView = false, authenticated }) => {
-  // Track component state
+  
   const [vids, setVideos] = useState(videos || [])
   const [alert, setAlert] = useState({ open: false })
   const [videoModal, setVideoModal] = useState({
     open: false,
   })
   
-  // Use our custom loading state hook (manages minimum duration and debouncing)
+  
   const [isLoading, setIsLoading] = useLoadingState({
     minDuration: 800,
     initialState: true,
     debounceToggles: true
   })
   
-  // Use our optimistic UI hook to track if videos have been shown before
+  
   useOptimisticUI({
     key: SESSION_KEY_VIDEO_LIST,
     data: videos,
     condition: (data) => Array.isArray(data) && data.length > 0
   })
   
-  // Update videos when the prop changes
+  
   useEffect(() => {
-    // Update local state without transitions
+    
     setVideos(videos || [])
     
-    // Signal that loading is complete after receiving videos
+    
     if (isLoading && videos) {
-      // Small delay to ensure smooth transition
+      
       const timer = setTimeout(() => {
         setIsLoading(false)
       }, 100)
@@ -158,7 +154,7 @@ const VideoList = ({ videos, loadingIcon = null, feedView = false, authenticated
         {alert.message}
       </SnackbarAlert>
       
-      {/* Always show skeletons during loading */}
+      {}
       {isLoading && (
         <Box>
           <VideoListSkeleton 
@@ -168,10 +164,10 @@ const VideoList = ({ videos, loadingIcon = null, feedView = false, authenticated
         </Box>
       )}
       
-      {/* After loading is complete, show appropriate content */}
+      {}
       {!isLoading && (
         <>
-          {/* Show videos if available */}
+          {}
           {vids && vids.length > 0 ? (
             <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
               <Grid container>
@@ -181,10 +177,10 @@ const VideoList = ({ videos, loadingIcon = null, feedView = false, authenticated
                     item 
                     xs={12}
                     sx={{ 
-                      opacity: 1, // Changed from 0 to ensure immediate visibility
-                      animation: `fadeIn 0.3s ease-in-out forwards ${index * 0.05}s`, // Faster animation
+                      opacity: 1, 
+                      animation: `fadeIn 0.3s ease-in-out forwards ${index * 0.05}s`, 
                       '@keyframes fadeIn': {
-                        '0%': { opacity: 0.7, transform: 'translateY(5px)' }, // Less dramatic animation
+                        '0%': { opacity: 0.7, transform: 'translateY(5px)' }, 
                         '100%': { opacity: 1, transform: 'translateY(0)' }
                       }
                     }}
@@ -202,8 +198,7 @@ const VideoList = ({ videos, loadingIcon = null, feedView = false, authenticated
               </Grid>
             </Paper>
           ) : (
-            /* Show empty state if no videos available */
-            EMPTY_STATE()
+                        EMPTY_STATE()
           )}
         </>
       )}

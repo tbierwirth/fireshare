@@ -1,22 +1,61 @@
-version: "3"
+version: "3.8"
 services:
   fireshare:
     container_name: fireshare
     image: shaneisrael/fireshare:latest
+    restart: unless-stopped
     ports:
-      - "8080:80"
+      - "80:80"
     volumes:
-      - ./dev_root/fireshare_data:/data
-      - ./dev_root/fireshare_processed:/processed
-      - ./dev_root/fireshare_videos:/videos
+      - /opt/fireshare/data:/data:rw
+      - /opt/fireshare/processed:/processed:rw
+      - /opt/fireshare/videos:/videos:rw
     environment:
       - ADMIN_USERNAME=admin
-      - ADMIN_PASSWORD=admin
-      - SECRET_KEY=replace_this_with_some_random_string
-      - MINUTES_BETWEEN_VIDEO_SCANS=5
-      # The location in the video thumbnails are generated. A value between 0-100 where 50 would be the frame in the middle of the video file and 0 would be the first frame of the video.
+      - ADMIN_PASSWORD=your-secure-password
+      - SECRET_KEY=replace_this_with_a_long_random_string
+      - MINUTES_BETWEEN_VIDEO_SCANS=15
       - THUMBNAIL_VIDEO_LOCATION=0
-      # The domain your instance is hosted at. (do not add http or https) e.x: v.fireshare.net, this is required for opengraph to work correctly for shared links. DO NOT SURROUND IN QUOTES.
+      # The domain your instance is hosted at (required for OpenGraph)
+      # Format: example.com (no http/https, no quotes)
       - DOMAIN=
       - PUID=1000
       - PGID=1000
+      - ENVIRONMENT=prod
+      
+    # Uncomment to enable basic monitoring
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/api/config"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+      
+    # Uncomment to set resource limits
+    #deploy:
+    #  resources:
+    #    limits:
+    #      cpus: '2'
+    #      memory: 2G
+    #    reservations:
+    #      cpus: '0.5'
+    #      memory: 1G
+
+# Uncomment for HTTPS using Traefik
+#  traefik:
+#    container_name: traefik
+#    image: traefik:v2.9
+#    restart: unless-stopped
+#    ports:
+#      - "80:80"
+#      - "443:443"
+#    volumes:
+#      - /var/run/docker.sock:/var/run/docker.sock:ro
+#      - ./traefik/config:/etc/traefik
+#    networks:
+#      - web
+#
+# Define a network if using Traefik
+#networks:
+#  web:
+#    external: true

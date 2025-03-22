@@ -29,7 +29,7 @@ const UploadCard = ({ authenticated, feedView = false, publicUpload = false, fet
     const file = event.target.files[0]
     setSelectedFile(file)
     
-    // Show tag dialog before starting upload
+    
     if (file) {
       setShowTagDialog(true)
     }
@@ -42,20 +42,20 @@ const UploadCard = ({ authenticated, feedView = false, publicUpload = false, fet
     }
   }
 
-  // Function to handle the drop event
+  
   const dropHandler = (event) => {
     event.preventDefault()
     setProgress(0)
     const file = event.dataTransfer.files[0]
     setSelectedFile(file)
     
-    // Show tag dialog before starting upload
+    
     if (file) {
       setShowTagDialog(true)
     }
   }
   
-  // Handle tag dialog close and upload
+  
   const handleDialogClose = (shouldUpload = false) => {
     setShowTagDialog(false)
     if (!shouldUpload) {
@@ -65,7 +65,7 @@ const UploadCard = ({ authenticated, feedView = false, publicUpload = false, fet
     }
   }
 
-  // Prevent default behavior for drag events to enable dropping files
+  
   const dragOverHandler = (event) => {
     event.preventDefault()
   }
@@ -75,10 +75,10 @@ const UploadCard = ({ authenticated, feedView = false, publicUpload = false, fet
       const formData = new FormData()
       formData.append('file', selectedFile)
       
-      // Add game to form data
+      
       formData.append('game', selectedGame)
       
-      // Add tags to form data
+      
       if (selectedTags && selectedTags.length > 0) {
         selectedTags.forEach(tag => {
           formData.append('tags[]', tag)
@@ -189,7 +189,7 @@ const UploadCard = ({ authenticated, feedView = false, publicUpload = false, fet
         </Paper>
       </label>
       
-      {/* Game and Tag Selection Dialog */}
+      {}
       <Dialog open={showTagDialog} onClose={() => handleDialogClose(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Categorize Your Video</DialogTitle>
         <DialogContent>
@@ -197,7 +197,7 @@ const UploadCard = ({ authenticated, feedView = false, publicUpload = false, fet
             Please select the game this video is from and add any additional tags.
           </Typography>
           
-          {/* Game Selection (Required) */}
+          {}
           <GameSelector 
             initialGame={selectedGame}
             onChange={setSelectedGame}
@@ -206,7 +206,7 @@ const UploadCard = ({ authenticated, feedView = false, publicUpload = false, fet
           
           <Divider sx={{ my: 2 }} />
           
-          {/* Additional Tags (Optional) */}
+          {}
           <Typography variant="subtitle2" gutterBottom>
             Additional Tags (Optional)
           </Typography>

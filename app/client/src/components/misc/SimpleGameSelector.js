@@ -4,12 +4,8 @@ import TextField from '@mui/material/TextField';
 import CircularProgress from '@mui/material/CircularProgress';
 import VideoService from '../../services/VideoService';
 
-/**
- * A simplified version of GameSelector without the complex state management
- * and debugging that might be causing issues
- */
 const SimpleGameSelector = ({ initialGame, onChange, sx = {} }) => {
-  // State
+  
   const [inputValue, setInputValue] = useState('');
   const [selectedGame, setSelectedGame] = useState('');
   const [options, setOptions] = useState([]);
@@ -67,7 +63,7 @@ const SimpleGameSelector = ({ initialGame, onChange, sx = {} }) => {
     const gameValue = newValue || '';
     setSelectedGame(gameValue);
     
-    // Notify parent
+    
     if (onChange) {
       onChange(gameValue);
     }
@@ -110,7 +106,7 @@ const SimpleGameSelector = ({ initialGame, onChange, sx = {} }) => {
           option.toLowerCase().includes(params.inputValue.toLowerCase())
         );
         
-        // Add current input as an option if not empty and not already in list
+        
         if (params.inputValue && !filtered.includes(params.inputValue)) {
           filtered.push(params.inputValue);
         }

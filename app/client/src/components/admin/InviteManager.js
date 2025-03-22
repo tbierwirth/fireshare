@@ -19,7 +19,7 @@ import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
-// Import Material UI icons properly
+
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
@@ -30,42 +30,42 @@ import useInviteManagement from './hooks/useInviteManagement';
 import { useAuth } from '../../contexts';
 
 const InviteManager = () => {
-  // Use the custom hook for invite management
+  
   const {
-    // Data
+    
     invites,
     email,
     expiresDays,
     
-    // State
+    
     isLoading,
     dialogOpen,
     alert,
     
-    // Mutations loading states
+    
     isCreating,
     isDeleting,
     
-    // State setters
+    
     setEmail,
     setExpiresDays,
     setDialogOpen,
     setAlert,
     
-    // Actions
+    
     handleCreateInvite,
     handleDeleteInvite,
     copyToClipboard,
     
-    // Helpers
+    
     getStatusColor,
     formatDate,
   } = useInviteManagement();
 
-  // Get auth status directly
+  
   const { isAdmin: authIsAdmin, user: authUser } = useAuth();
   
-  // Log the current auth status for debugging
+  
   console.log('InviteManager - Component render state:', {
     invites,
     isLoading,

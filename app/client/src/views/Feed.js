@@ -14,44 +14,44 @@ import selectFolderTheme from '../common/reactSelectFolderTheme'
 import selectSortTheme from '../common/reactSelectSortTheme'
 import { SORT_OPTIONS } from '../common/constants'
 
-// Converting folders for select input
+
 const createSelectFolders = (folders) => {
   return folders.map((f) => ({ value: f, label: f }))
 }
 
-// Parse URL query parameters
+
 function useQuery() {
   const { search } = useLocation()
   return useMemo(() => new URLSearchParams(search), [search])
 }
 
-// Session key for tracking if this route has shown videos before
+
 const SESSION_KEY_FEED = 'route:feed:hasVideos'
 
-// Feed component - ONLY shows public videos (for all users)
+
 const Feed = ({ authenticated, searchText, cardSize, listStyle, user }) => {
-  // DEBUG: Log when Feed receives new props
+  
   React.useEffect(() => {
     console.log(`[FEED DEBUG] Feed component received props: cardSize=${cardSize}, listStyle=${listStyle}`);
     
-    // Update CSS variable in document root - this is critical for slider to work
+    
     if (cardSize) {
       document.documentElement.style.setProperty('--card-size', `${cardSize}px`);
     }
   }, [cardSize, listStyle]);
-  // Feed component is for public videos only
   
-  // Parse query parameters
+  
+  
   const query = useQuery()
   const category = query.get('category')
   const gameParam = query.get('game')
   
-  // Direct React Query hook usage (VideoContext removed)
+  
   const { refreshVideos } = useVideoCache();
   
-  // No need to track card size internally - use prop directly
   
-  // Local state
+  
+  
   const [selectedFolder, setSelectedFolder] = useState(
     category
       ? { value: category, label: category }
@@ -117,19 +117,19 @@ const Feed = ({ authenticated, searchText, cardSize, listStyle, user }) => {
     }
   });
   
-  // Extract videos from response
+  
   const publicVideos = useMemo(() => {
     return videosResponse?.data?.videos || [];
   }, [videosResponse]);
   
-  // CRITICAL FIX: More aggressive approach to loading state
+  
   useEffect(() => {
-    // If we have a videosResponse or publicVideos, force loading to false
+    
     if (videosResponse || publicVideos.length > 0) {
       setIsLoading(false);
     }
     
-    // Also set a timer to ensure loading is forced to false even if something else sets it
+    
     const timer = setTimeout(() => {
       setIsLoading(false);
     }, 500);
@@ -137,14 +137,14 @@ const Feed = ({ authenticated, searchText, cardSize, listStyle, user }) => {
     return () => clearTimeout(timer);
   }, [setIsLoading, videosResponse, publicVideos]);
   
-  // Use optimistic UI hook to track previous content state
+  
   const hadPreviousContent = useOptimisticUI({
     key: SESSION_KEY_FEED,
     data: publicVideos,
     condition: (data) => Array.isArray(data) && data.length > 0
   });
   
-  // Process folders from videos
+  
   const folders = useMemo(() => {
     if (!publicVideos || publicVideos.length === 0) {
       return ['All Videos'];
@@ -153,9 +153,9 @@ const Feed = ({ authenticated, searchText, cardSize, listStyle, user }) => {
     const tfolders = [];
     const gameSet = new Set();
     
-    // Extract folder info from videos
+    
     publicVideos.forEach((v) => {
-      // Path folders
+      
       const split = v.path
         .split('/')
         .slice(0, -1)
@@ -175,7 +175,7 @@ const Feed = ({ authenticated, searchText, cardSize, listStyle, user }) => {
     tfolders.sort((a, b) => (a.toLowerCase() > b.toLowerCase() ? 1 : -1));
     tfolders.unshift('All Videos');
     
-    // Add games section
+    
     if (gameSet.size > 0) {
       tfolders.push('--- Games ---');
       const gameArray = Array.from(gameSet);
@@ -188,14 +188,14 @@ const Feed = ({ authenticated, searchText, cardSize, listStyle, user }) => {
     return tfolders;
   }, [publicVideos]);
   
-  // Update search when prop changes
+  
   React.useEffect(() => {
     if (searchText !== search) {
       setSearch(searchText);
     }
   }, [searchText, search]);
   
-  // Handle error alerts
+  
   React.useEffect(() => {
     if (isError && error) {
       setAlert({
@@ -206,7 +206,7 @@ const Feed = ({ authenticated, searchText, cardSize, listStyle, user }) => {
     }
   }, [isError, error]);
   
-  // Handle folder selection
+  
   const handleFolderSelection = (folder) => {
     if (folder.value === '--- Games ---') {
       return;
@@ -241,25 +241,25 @@ const Feed = ({ authenticated, searchText, cardSize, listStyle, user }) => {
   const handleSortSelection = (sortOption) => {
     setSetting('sortOption', sortOption);
     setSelectedSort(sortOption);
-    // Refetch with new sort order
+    
     refetch();
   };
   
-  // Refresh videos with React Query directly
+  
   const fetchVideos = useCallback(() => {
-    // Use our refreshVideos function that handles all caching
+    
     refreshVideos();
     
-    // Also directly refetch the specific query for public videos
+    
     refetch();
     
-    // Force isLoading to false after a short delay 
+    
     setTimeout(() => {
       setIsLoading(false);
     }, 800);
   }, [refreshVideos, refetch, setIsLoading]);
   
-  // Filter videos by search text
+  
   const filteredVideos = useMemo(() => {
     if (!publicVideos || publicVideos.length === 0) {
       return [];
@@ -274,7 +274,7 @@ const Feed = ({ authenticated, searchText, cardSize, listStyle, user }) => {
     });
   }, [publicVideos, search]);
   
-  // Filter videos by folder
+  
   const displayVideos = useMemo(() => {
     if (!filteredVideos || filteredVideos.length === 0) {
       return [];
@@ -287,7 +287,7 @@ const Feed = ({ authenticated, searchText, cardSize, listStyle, user }) => {
     } else if (gameParam) {
       return filteredVideos.filter((v) => v.game === selectedFolder.value);
     } else {
-      // Path-based filtering
+      
       return filteredVideos.filter((v) => {
         return v.path
           .split('/')
@@ -347,7 +347,7 @@ const Feed = ({ authenticated, searchText, cardSize, listStyle, user }) => {
                 </Box>
               )}
               
-              {/* Upload and refresh buttons */}
+              {}
               <Box sx={{ mb: 3, display: 'flex', justifyContent: 'center', gap: 2 }}>
                 <Button 
                   variant="outlined"
@@ -358,7 +358,7 @@ const Feed = ({ authenticated, searchText, cardSize, listStyle, user }) => {
                   {isFetching ? "Refreshing..." : "Refresh Videos"}
                 </Button>
                 
-                {/* Only show upload button if user is authenticated */}
+                {}
                 {authenticated && (
                   <UploadButton onSuccess={(result) => {
                     if (result) {
@@ -367,11 +367,11 @@ const Feed = ({ authenticated, searchText, cardSize, listStyle, user }) => {
                         message: result.message,
                         open: true
                       });
-                      // Refresh videos after successful upload
+                      
                       if (result.type === 'success') {
-                        // Force invalidate the cache and refetch all videos
+                        
                         fetchVideos();
-                        // Also directly call refreshVideos to ensure all caches are updated
+                        
                         refreshVideos();
                       }
                     }
@@ -379,17 +379,17 @@ const Feed = ({ authenticated, searchText, cardSize, listStyle, user }) => {
                 )}
               </Box>
               
-              {/* No skeletons are used now */}
+              {}
               
-              {/* Main content will render below */}
+              {}
               
-              {/* Main content container with consistent height to prevent layout shifts */}
+              {}
               <Box sx={{ 
                 minHeight: '400px', 
                 position: 'relative', 
                 transition: 'opacity 0.3s ease'
               }}>
-                {/* Always render videos if they exist, regardless of loading state */}
+                {}
                 {(displayVideos && displayVideos.length > 0) ? (
                   <Box sx={{ 
                     animation: 'fadeIn 0.5s ease-in-out',
@@ -413,14 +413,13 @@ const Feed = ({ authenticated, searchText, cardSize, listStyle, user }) => {
                         size={cardSize}
                         fetchVideos={fetchVideos}
                         videos={displayVideos}
-                        // Only change key when videos length changes, not on card size change
+                        
                         key={`videocards-${displayVideos.length}`}
                       />
                     )}
                   </Box>
                 ) : (
-                  /* Show loading spinner while fetching initial data */
-                  isFetching && !hadPreviousContent ? (
+                                    isFetching && !hadPreviousContent ? (
                     <Box sx={{ 
                       display: 'flex', 
                       justifyContent: 'center', 
@@ -430,8 +429,7 @@ const Feed = ({ authenticated, searchText, cardSize, listStyle, user }) => {
                       <LoadingSpinner size={40} />
                     </Box>
                   ) : (
-                    /* Only show empty state if we're sure there are no videos */
-                    <Box sx={{ 
+                                        <Box sx={{ 
                       display: 'flex', 
                       justifyContent: 'center', 
                       mt: 10, 
@@ -467,17 +465,17 @@ const Feed = ({ authenticated, searchText, cardSize, listStyle, user }) => {
   );
 }
 
-// Custom comparison function for React.memo 
-// Only re-render when props we care about have changed
+
+
 function feedPropsAreEqual(prevProps, nextProps) {
-  // Always re-render when these change
+  
   if (prevProps.authenticated !== nextProps.authenticated) return false;
   if (prevProps.searchText !== nextProps.searchText) return false;
   if (prevProps.listStyle !== nextProps.listStyle) return false;
   
-  // Card size changes are handled via direct DOM manipulation
-  // so we don't need to re-render the whole component
-  // return true;
+  
+  
+  
   
   return true;
 }

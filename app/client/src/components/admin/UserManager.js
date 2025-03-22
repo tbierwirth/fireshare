@@ -19,7 +19,7 @@ import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem'; 
-// Import Material UI icons properly
+
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
@@ -30,39 +30,39 @@ import useUserManagement from './hooks/useUserManagement';
 import { useAuth } from '../../contexts';
 
 const UserManager = () => {
-  // Use the custom hook for user management
+  
   const {
-    // Data
+    
     users,
     newUser,
     editingUser,
     
-    // State
+    
     isLoading,
     createDialogOpen,
     editDialogOpen,
     alert,
     
-    // Mutations loading states
+    
     isCreating,
     isUpdating,
     isDeleting,
     
-    // State setters
+    
     setNewUser,
     setEditingUser,
     setCreateDialogOpen,
     setEditDialogOpen,
     setAlert,
     
-    // Actions
+    
     handleCreateUser,
     handleEditUser,
     handleDeleteUser,
     handleEditClick,
   } = useUserManagement();
 
-  // Helper functions for UI display
+  
   const getRoleColor = (role) => {
     return role === 'admin' ? 'error' : 'primary';
   };
@@ -85,10 +85,10 @@ const UserManager = () => {
     return new Date(dateString).toLocaleString();
   };
 
-  // Get auth status directly
+  
   const { isAdmin: authIsAdmin, user: authUser } = useAuth();
   
-  // Log the current auth status for debugging
+  
   console.log('UserManager - Component render state:', {
     users,
     isLoading,
@@ -114,7 +114,7 @@ const UserManager = () => {
       
       <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Typography variant="h5">User Management</Typography>
-        {/* Direct user creation button removed - users are created through invite system */}
+        {}
       </Box>
 
       <TableContainer component={Paper}>
@@ -171,14 +171,14 @@ const UserManager = () => {
                     <IconButton 
                       color="primary" 
                       onClick={() => handleEditClick(user)}
-                      disabled={isDeleting} // Disable during delete operation
+                      disabled={isDeleting} 
                     >
                       <EditIcon />
                     </IconButton>
                     <IconButton 
                       color="error" 
                       onClick={() => handleDeleteUser(user.id)}
-                      disabled={isDeleting} // Disable during delete operation
+                      disabled={isDeleting} 
                     >
                       {isDeleting ? <CircularProgress size={24} /> : <DeleteIcon />}
                     </IconButton>
@@ -190,7 +190,7 @@ const UserManager = () => {
         </Table>
       </TableContainer>
 
-      {/* Create User Dialog */}
+      {}
       <Dialog 
         open={createDialogOpen} 
         onClose={() => {
@@ -287,7 +287,7 @@ const UserManager = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Edit User Dialog */}
+      {}
       {editingUser && (
         <Dialog 
           open={editDialogOpen} 

@@ -23,9 +23,9 @@ const CompactVideoCard = ({
   cardHeight, 
   authenticated, 
   deleted,
-  fitMode = 'cover', // New prop to control how image fits (cover, contain)
-  onVideoLoaded = () => {}, // Callback when video poster image loads
-  onVideoError = () => {}   // Callback when video poster fails to load
+  fitMode = 'cover', 
+  onVideoLoaded = () => {}, 
+  onVideoError = () => {}   
 }) => {
   const [intVideo, setIntVideo] = React.useState(video)
   const [videoId, setVideoId] = React.useState(video.video_id)
@@ -33,9 +33,9 @@ const CompactVideoCard = ({
   const [description, setDescription] = React.useState(video.info?.description)
   const [updatedTitle, setUpdatedTitle] = React.useState(null)
   const debouncedTitle = useDebounce(updatedTitle, 1500)
-  // We keep track of hover state even though we disabled hover preview
-  // for future use if we re-enable the feature
-  const [hover, setHover] = React.useState(false) // eslint-disable-line no-unused-vars
+  
+  
+  const [hover, setHover] = React.useState(false) 
   const [privateView, setPrivateView] = React.useState(video.info?.private)
 
   const [detailsModalOpen, setDetailsModalOpen] = React.useState(false)
@@ -54,16 +54,16 @@ const CompactVideoCard = ({
     previousVideoRef.current = video
   })
 
-  // Disabled hover preview
+  
   const debouncedMouseEnter = React.useRef(
     _.debounce(() => {
-      // Do nothing - hover preview disabled
+      
     }, 750),
   ).current
 
   const handleMouseLeave = () => {
     debouncedMouseEnter.cancel()
-    // Keep hover state false
+    
     setHover(false)
   }
 
@@ -88,7 +88,7 @@ const CompactVideoCard = ({
     if (debouncedTitle && debouncedTitle !== title) {
       update()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [debouncedTitle])
 
   const handleMouseDown = (e) => {
@@ -123,25 +123,25 @@ const CompactVideoCard = ({
     }
   }
 
-  // Get video dimensions or use standard 16:9 if not available
-  let actualWidth = video.info?.width || 1920;  // Default to 1080p width if not specified
-  let actualHeight = video.info?.height || 1080; // Default to 1080p height if not specified
   
-  // Calculate the actual aspect ratio of this specific video
-  // Use 16:9 (1.78) as fallback if calculations result in invalid values
+  let actualWidth = video.info?.width || 1920;  
+  let actualHeight = video.info?.height || 1080; 
+  
+  
+  
   const aspectRatio = actualWidth && actualHeight ? actualWidth / actualHeight : 16/9;
   
-  // Standard aspect ratio currently unused but kept for future aspect ratio calculations
-  // eslint-disable-next-line no-unused-vars
-  const standardAspectRatio = 16/9; // Standard video aspect ratio for uniform display
   
-  // Handle percentage-based width (currently unused but kept for future width calculations)
-  // eslint-disable-next-line no-unused-vars
+  
+  const standardAspectRatio = 16/9; 
+  
+  
+  
   const numericWidth = typeof cardWidth === 'string' && cardWidth.includes('%')
-    ? 300 // Default to 300px for calculating height when using percentage width 
+    ? 300 
     : cardWidth;
   
-  // Only log in development and only occasionally to reduce noise
+  
   if (process.env.NODE_ENV === 'development' && Math.random() < 0.01) {
     console.log(`Video ${video.video_id} dimensions:`, {
       width: actualWidth,
@@ -290,9 +290,9 @@ const CompactVideoCard = ({
                 </Grid>
               </Box>
             )}
-            {/* Based on server code at line 187 in videos.py, we need to use the poster API endpoint */}
-            {/* CRITICAL: Removed cache-busting to prevent image reload during resize */}
-            {/* Hardcoded placeholder for testing */}
+            {}
+            {}
+            {}
             <div 
               style={{ 
                 position: 'absolute', 
@@ -311,7 +311,7 @@ const CompactVideoCard = ({
               {video.video_id.substring(0, 8)}
             </div>
             
-            {/* Direct img element - more reliable than React */}
+            {}
             <img
               className="video-card-image"
               src={`${URL}/api/video/poster?id=${video.video_id}&no-cache=${Date.now()}`}
@@ -327,17 +327,17 @@ const CompactVideoCard = ({
               }}
               onLoad={(e) => {
                 console.log(`Poster loaded for ${video.video_id}`);
-                e.target.style.zIndex = 3; // Bring to front when loaded
+                e.target.style.zIndex = 3; 
                 onVideoLoaded(e);
               }}
               onError={(e) => {
                 console.error(`Failed to load poster for ${video.video_id}`, e);
-                e.target.style.display = 'none'; // Hide if error
+                e.target.style.display = 'none'; 
                 onVideoError(e);
               }}
             />
 
-            {/* Video hover preview disabled */}
+            {}
             <Box sx={{ position: 'absolute', bottom: 3, left: 3 }}>
               <CopyToClipboard text={`${PURL}${video.video_id}`}>
                 <IconButton
@@ -396,7 +396,7 @@ const CompactVideoCard = ({
               </Typography>
             </Box>
             
-            {/* Show tags if available */}
+            {}
             {video.tags && video.tags.length > 0 && (
               <Box 
                 sx={{ 

@@ -5,17 +5,17 @@ import Chip from '@mui/material/Chip';
 import { CircularProgress } from '@mui/material';
 import VideoService from '../../services/VideoService';
 
-// Debounce function to limit API calls
+
 const useDebounce = (value, delay) => {
   const [debouncedValue, setDebouncedValue] = useState(value);
   
   useEffect(() => {
-    // Update debounced value after delay
+    
     const handler = setTimeout(() => {
       setDebouncedValue(value);
     }, delay);
     
-    // Cancel the timeout if value changes or unmounts
+    
     return () => {
       clearTimeout(handler);
     };
@@ -24,14 +24,6 @@ const useDebounce = (value, delay) => {
   return debouncedValue;
 };
 
-/**
- * Tag input component with autocomplete
- * @param {Object} props
- * @param {Array} props.initialTags - Initial tags to display
- * @param {Function} props.onChange - Callback when tags change
- * @param {string} props.label - Input label
- * @param {Object} props.sx - Additional styles
- */
 const TagInput = ({ initialTags = [], onChange, label = "Tags", sx = {} }) => {
   const [inputValue, setInputValue] = useState('');
   const [selectedTags, setSelectedTags] = useState(initialTags);
@@ -81,7 +73,7 @@ const TagInput = ({ initialTags = [], onChange, label = "Tags", sx = {} }) => {
     };
   }, [debouncedInputValue, selectedTags]);
 
-  // When tags change, notify parent
+  
   useEffect(() => {
     if (onChange) {
       onChange(selectedTags);
@@ -89,7 +81,7 @@ const TagInput = ({ initialTags = [], onChange, label = "Tags", sx = {} }) => {
   }, [selectedTags, onChange]);
 
   const handleTagChange = (event, newValue) => {
-    // Allow creation of new tags
+    
     setSelectedTags(newValue);
   };
 
@@ -109,7 +101,7 @@ const TagInput = ({ initialTags = [], onChange, label = "Tags", sx = {} }) => {
           option.toLowerCase().includes(params.inputValue.toLowerCase())
         );
         
-        // Add "create" option if input doesn't match any option
+        
         if (params.inputValue !== '' && !filtered.includes(params.inputValue)) {
           filtered.push(params.inputValue);
         }

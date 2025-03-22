@@ -4,9 +4,6 @@ import TextField from '@mui/material/TextField';
 import { CircularProgress, Box } from '@mui/material';
 import VideoService from '../../services/VideoService';
 
-/**
- * Simpler GameSelector component with direct API calls and minimal state management
- */
 const GameSelector = ({ 
   initialGame = '', 
   onChange, 
@@ -113,7 +110,7 @@ const GameSelector = ({
           option.toLowerCase().includes(params.inputValue.toLowerCase())
         );
         
-        // Add current input as an option if not empty and not already in list
+        
         if (params.inputValue && !filtered.includes(params.inputValue)) {
           filtered.push(params.inputValue);
         }

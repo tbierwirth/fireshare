@@ -4,18 +4,18 @@ import TextField from '@mui/material/TextField';
 import { CircularProgress } from '@mui/material';
 import VideoService from '../../services/VideoService';
 
-// THIS IS A CRITICAL DEBUGGING VERSION OF GAMESELECTOR
-// It has extensive logging to help diagnose UI issues
 
-// Debug counter to track component instances
+
+
+
 let instanceCounter = 0;
 
 const GameSelector = ({ initialGame, onChange, sx = {} }) => {
-  // Create unique instance ID for debugging
+  
   const instanceId = useRef(`GameSelector-${++instanceCounter}`);
   console.log(`[${instanceId.current}] RENDER with initialGame:`, initialGame);
   
-  // Simple local state - no complex interactions
+  
   const [inputValue, setInputValue] = useState('');
   const [selectedGame, setSelectedGame] = useState('');
   const [options, setOptions] = useState([]);
@@ -87,7 +87,7 @@ const GameSelector = ({ initialGame, onChange, sx = {} }) => {
     };
   }, []);
   
-  // Handle initialGame changes - only run this once when games are loaded
+  
   useEffect(() => {
     if (!mounted.current) {
       console.log(`[${instanceId.current}] Not mounted, skipping initialGame effect`);
@@ -100,7 +100,7 @@ const GameSelector = ({ initialGame, onChange, sx = {} }) => {
       hasSynced: hasSyncedInitialGame.current
     });
     
-    // Don't sync until we have loaded games (unless initialGame is explicitly empty)
+    
     if (!hasLoadedGames.current && initialGame !== '') {
       console.log(`[${instanceId.current}] Games not loaded yet, deferring initialGame sync`);
       return;
@@ -152,7 +152,7 @@ const GameSelector = ({ initialGame, onChange, sx = {} }) => {
     setSelectedGame(newValue || '');
   };
   
-  // Render the component
+  
   return (
     <Autocomplete
       value={selectedGame}
@@ -190,7 +190,7 @@ const GameSelector = ({ initialGame, onChange, sx = {} }) => {
           option.toLowerCase().includes(params.inputValue.toLowerCase())
         );
         
-        // Add current input as an option if not empty and not already in list
+        
         if (params.inputValue && !filtered.includes(params.inputValue)) {
           filtered.push(params.inputValue);
         }

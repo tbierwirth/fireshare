@@ -12,7 +12,7 @@ import GameSelector from '../tags/GameSelectorWithQuery';
 import { useQueryClient, useMutation, useQuery } from '@tanstack/react-query';
 import { useVideoGame, useVideoTags } from '../../services/VideoQueryHooks';
 
-// Modal style
+
 const style = {
   position: 'absolute',
   top: '50%',
@@ -27,7 +27,7 @@ const style = {
   overflowY: 'auto'
 };
 
-// Skeleton component for loading state
+
 const FieldSkeleton = ({ height = 56 }) => (
   <Skeleton 
     variant="rectangular" 
@@ -38,12 +38,12 @@ const FieldSkeleton = ({ height = 56 }) => (
   />
 );
 
-// UpdateDetailsModal using React Query for data fetching
+
 const UpdateDetailsModal = ({ open, close, videoId, currentTitle, currentDescription, alertHandler }) => {
-  // Query client for invalidation
+  
   const queryClient = useQueryClient();
   
-  // Local state
+  
   const [title, setTitle] = React.useState('');
   const [description, setDescription] = React.useState('');
   const [tags, setTags] = React.useState([]);
@@ -107,14 +107,14 @@ const UpdateDetailsModal = ({ open, close, videoId, currentTitle, currentDescrip
         message: 'Video updated successfully!'
       });
       
-      // Invalidate queries to refresh data
+      
       queryClient.invalidateQueries(['videoDetails', videoId]);
       queryClient.invalidateQueries(['videoGame', videoId]);
       queryClient.invalidateQueries(['videoTags', videoId]);
       queryClient.invalidateQueries(['videos']);
       queryClient.invalidateQueries(['publicVideos']);
       
-      // Close modal with updated data
+      
       close({
         title,
         description,
@@ -132,7 +132,7 @@ const UpdateDetailsModal = ({ open, close, videoId, currentTitle, currentDescrip
     }
   });
   
-  // Mutation for deleting video
+  
   const deleteMutation = useMutation({
     mutationFn: () => VideoService.delete(videoId),
     onSuccess: () => {
@@ -142,7 +142,7 @@ const UpdateDetailsModal = ({ open, close, videoId, currentTitle, currentDescrip
         message: 'Video deleted successfully'
       });
       
-      // Invalidate queries to refresh lists
+      
       queryClient.invalidateQueries(['videos']);
       queryClient.invalidateQueries(['publicVideos']);
       
@@ -157,25 +157,25 @@ const UpdateDetailsModal = ({ open, close, videoId, currentTitle, currentDescrip
     }
   });
   
-  // Handle save action
+  
   const handleSave = () => {
     saveMutation.mutate();
   };
   
-  // Handle delete action
+  
   const handleDelete = () => {
     deleteMutation.mutate();
   };
   
-  // Close modal
+  
   const handleClose = () => {
     close(null);
   };
   
-  // Check if any mutation is in progress
+  
   const isLoading = gameLoading || tagsLoading || saveMutation.isPending || deleteMutation.isPending;
   
-  // Skip rendering if modal is closed
+  
   if (!open) return null;
   
   return (
@@ -191,7 +191,7 @@ const UpdateDetailsModal = ({ open, close, videoId, currentTitle, currentDescrip
             Edit Video Details
           </Typography>
           
-          {/* Title field */}
+          {}
           <TextField
             id="modal-update-details-title"
             label="Video Title"
@@ -200,7 +200,7 @@ const UpdateDetailsModal = ({ open, close, videoId, currentTitle, currentDescrip
             disabled={isLoading}
           />
           
-          {/* Description field */}
+          {}
           <TextField
             id="modal-update-details-description"
             label="Video Description"
@@ -217,7 +217,7 @@ const UpdateDetailsModal = ({ open, close, videoId, currentTitle, currentDescrip
             Game
           </Typography>
           
-          {/* Game selector with better loading state handling */}
+          {}
           {gameLoading ? (
             <FieldSkeleton />
           ) : (
@@ -225,7 +225,7 @@ const UpdateDetailsModal = ({ open, close, videoId, currentTitle, currentDescrip
               initialGame={game} 
               onChange={(newGame) => {
                 console.log('Game changed to:', newGame);
-                // No need to setState - passing directly to mutation
+                
               }}
               disabled={isLoading}
             />
@@ -241,7 +241,7 @@ const UpdateDetailsModal = ({ open, close, videoId, currentTitle, currentDescrip
             Additional Tags
           </Typography>
           
-          {/* Tags input with better loading state handling */}
+          {}
           {tagsLoading ? (
             <FieldSkeleton height={80} />
           ) : (
@@ -257,7 +257,7 @@ const UpdateDetailsModal = ({ open, close, videoId, currentTitle, currentDescrip
             Add optional tags like "funny", "highlight", or "tutorial" to make your videos easier to find.
           </Typography>
           
-          {/* Save button */}
+          {}
           <Button
             variant="contained"
             onClick={handleSave}
@@ -273,7 +273,7 @@ const UpdateDetailsModal = ({ open, close, videoId, currentTitle, currentDescrip
           
           <Divider sx={{ my: 1 }} />
           
-          {/* Delete section */}
+          {}
           {showDelete ? (
             <ButtonGroup fullWidth>
               <Button
