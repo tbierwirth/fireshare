@@ -69,6 +69,41 @@ def search_games():
         
     return jsonify({"games": games_with_count})
 
+@games_bp.route('/<game_id>', methods=['PUT'])
+@login_required
+def update_game(game_id):
+    
+    if not current_user.is_admin():
+        return jsonify({"error": "Admin access required"}), 403
+    
+    
+    stmt = select(Game).filter_by(id=game_id)
+    game = db.session.execute(stmt).scalar_one_or_none()
+    
+    if not game:
+        return jsonify({"error": "Game not found"}), 404
+    
+    data = request.json
+    new_name = data.get('name')
+    
+    if not new_name:
+        return jsonify({"error": "Name is required"}), 400
+        
+    
+    game.name = new_name
+    game.slug = Game.generate_slug(new_name)
+    
+    db.session.commit()
+    
+    
+    stmt = select(func.count()).select_from(Video).filter_by(game_id=game.id)
+    video_count = db.session.execute(stmt).scalar_one()
+    
+    game_json = game.json()
+    game_json["video_count"] = video_count
+    
+    return jsonify(game_json), 200
+
 
 def register_direct_routes(app_or_blueprint):
     

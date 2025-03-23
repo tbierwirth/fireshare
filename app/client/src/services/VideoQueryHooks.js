@@ -182,7 +182,11 @@ export function useFolders() {
 
 export function useVideoCache() {
   const queryClient = useQueryClient();
+  
+  // Standard refresh - invalidates all caches and triggers immediate refetching
   const refreshVideos = React.useCallback((() => {
+    // Just invalidate the queries but don't force an immediate refetch
+    // This is more efficient and prevents UI jank
     queryClient.invalidateQueries({
       queryKey: [ "videos" ]
     });
@@ -198,22 +202,22 @@ export function useVideoCache() {
     queryClient.invalidateQueries({
       queryKey: [ "folders" ]
     });
-    queryClient.refetchQueries({
-      queryKey: [ "videos" ]
-    });
-    queryClient.refetchQueries({
-      queryKey: [ "publicVideos" ]
-    });
+    
+    // Clear legacy localStorage cache
     localStorage.removeItem("videos_updated_at desc");
     localStorage.removeItem("public_videos_updated_at desc");
+    
+    // Preserve optimistic UI flags in sessionStorage
     const sessionKeys = [ "route:feed:hasVideos", "route:videos:hasVideos", "route:publicVideos:hasVideos", "route:dashboard:hasVideos" ];
     sessionKeys.forEach((key => {
       if (sessionStorage.getItem(key) === "true") {
         sessionStorage.setItem(key, "true");
       }
     }));
+    
     return true;
   }), [ queryClient ]);
+  
   return {
     refreshVideos: refreshVideos
   };

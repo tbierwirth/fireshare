@@ -2,10 +2,12 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react'
 import { Box, Grid, Stack, Typography, Button } from '@mui/material'
 import { useLocation } from 'react-router-dom'
 import Select from 'react-select'
+import { useQueryClient } from '@tanstack/react-query'
 import VideoCards from '../components/admin/VideoCards'
 import VideoList from '../components/admin/VideoList'
 import LoadingSpinner from '../components/misc/LoadingSpinner'
 import UploadButton from '../components/misc/UploadButton'
+import ProcessingVideoCard from '../components/admin/ProcessingVideoCard'
 import SnackbarAlert from '../components/alert/SnackbarAlert'
 import { getSetting, setSetting } from '../common/utils'
 import { usePublicVideos, useVideoCache } from '../services/VideoQueryHooks'
@@ -30,6 +32,7 @@ const SESSION_KEY_FEED = 'route:feed:hasVideos'
 
 
 const Feed = ({ authenticated, searchText, cardSize, listStyle, user }) => {
+  const queryClient = useQueryClient();
   
   React.useEffect(() => {
     console.log(`[FEED DEBUG] Feed component received props: cardSize=${cardSize}, listStyle=${listStyle}`);
@@ -62,6 +65,9 @@ const Feed = ({ authenticated, searchText, cardSize, listStyle, user }) => {
   const [selectedSort, setSelectedSort] = useState(getSetting('sortOption') || SORT_OPTIONS[0]);
   const [alert, setAlert] = useState({ open: false });
   const [search, setSearch] = useState(searchText || '');
+  
+  // State for videos that are currently being processed
+  const [processingVideos, setProcessingVideos] = useState([]);
   
   // This is now handled by the useOptimisticUI hook
   
@@ -117,6 +123,14 @@ const Feed = ({ authenticated, searchText, cardSize, listStyle, user }) => {
     }
   });
   
+  // Handler for when processing is complete
+  const handleProcessingComplete = useCallback((videoId) => {
+    // Remove the video from processing videos
+    setProcessingVideos(prev => prev.filter(v => v.videoId !== videoId));
+    
+    // Refetch videos to get the processed video
+    queryClient.refetchQueries({ queryKey: ['publicVideos'] });
+  }, [queryClient]);
   
   const publicVideos = useMemo(() => {
     return videosResponse?.data?.videos || [];
@@ -369,10 +383,26 @@ const Feed = ({ authenticated, searchText, cardSize, listStyle, user }) => {
                       });
                       
                       if (result.type === 'success') {
-                        
-                        fetchVideos();
-                        
+                        // Always refresh the video list when successful
                         refreshVideos();
+                        
+                        // If a video has started processing, add it to the state for a placeholder card
+                        if (result.processingStarted && result.jobId && result.videoId) {
+                          // Add a processing video to the local state
+                          // This will show immediately while the video is being processed
+                          setProcessingVideos(prev => [
+                            ...prev, 
+                            {
+                              jobId: result.jobId,
+                              videoId: result.videoId,
+                              title: result.videoTitle || 'New Video',
+                              timestamp: new Date().getTime()
+                            }
+                          ]);
+                        } else {
+                          // Traditional full refresh if not a processing video
+                          fetchVideos();
+                        }
                       }
                     }
                   }} />
@@ -390,7 +420,7 @@ const Feed = ({ authenticated, searchText, cardSize, listStyle, user }) => {
                 transition: 'opacity 0.3s ease'
               }}>
                 {}
-                {(displayVideos && displayVideos.length > 0) ? (
+                {(displayVideos && displayVideos.length > 0) || processingVideos.length > 0 ? (
                   <Box sx={{ 
                     animation: 'fadeIn 0.5s ease-in-out',
                     '@keyframes fadeIn': {
@@ -399,23 +429,64 @@ const Feed = ({ authenticated, searchText, cardSize, listStyle, user }) => {
                     }
                   }}>
                     {listStyle === 'list' ? (
-                      <VideoList
-                        authenticated={authenticated}
-                        loadingIcon={isFetching ? <LoadingSpinner size={20} /> : null}
-                        feedView
-                        videos={displayVideos}
-                      />
+                      <>
+                        <VideoList
+                          authenticated={authenticated}
+                          loadingIcon={isFetching ? <LoadingSpinner size={20} /> : null}
+                          feedView
+                          videos={displayVideos}
+                        />
+                        {/* Processing videos not shown in list view */}
+                      </>
                     ) : (
-                      <VideoCards
-                        authenticated={authenticated}
-                        loadingIcon={isFetching ? <LoadingSpinner size={20} /> : null}
-                        feedView={true}
-                        size={cardSize}
-                        fetchVideos={fetchVideos}
-                        videos={displayVideos}
+                      <>
+                        {/* Display actual videos */}
+                        <VideoCards
+                          authenticated={authenticated}
+                          loadingIcon={isFetching ? <LoadingSpinner size={20} /> : null}
+                          feedView={true}
+                          size={cardSize}
+                          fetchVideos={fetchVideos}
+                          videos={displayVideos}
+                          key={`videocards-${displayVideos.length}`}
+                        />
                         
-                        key={`videocards-${displayVideos.length}`}
-                      />
+                        {/* Display processing videos grid */}
+                        {processingVideos.length > 0 && (
+                          <Box 
+                            className="video-grid"
+                            sx={{ 
+                              display: 'grid',
+                              gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                              gap: 2,
+                              mt: 2
+                            }}
+                          >
+                            {processingVideos.map(processingVideo => (
+                              <Box 
+                                key={`processing-${processingVideo.videoId}`} 
+                                className="video-card-container"
+                                sx={{
+                                  width: '100%',
+                                  animation: 'fadeInCard 0.4s ease-out forwards',
+                                  '@keyframes fadeInCard': {
+                                    '0%': { opacity: 0, transform: 'translateY(8px)' },
+                                    '100%': { opacity: 1, transform: 'translateY(0)' }
+                                  },
+                                  outline: '1px solid rgba(255,255,255,0.1)',
+                                }}
+                              >
+                                <ProcessingVideoCard
+                                  jobId={processingVideo.jobId}
+                                  videoId={processingVideo.videoId}
+                                  title={processingVideo.title}
+                                  onProcessingComplete={handleProcessingComplete}
+                                />
+                              </Box>
+                            ))}
+                          </Box>
+                        )}
+                      </>
                     )}
                   </Box>
                 ) : (

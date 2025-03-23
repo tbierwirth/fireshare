@@ -54,9 +54,9 @@ def search_tags():
         
     return jsonify({"tags": tags_with_count})
 
-@tags_bp.route('/<tag_id>', methods=['DELETE'])
+@tags_bp.route('/<tag_id>', methods=['DELETE', 'PUT'])
 @login_required
-def delete_tag(tag_id):
+def manage_tag(tag_id):
     
     if not current_user.is_admin():
         return jsonify({"error": "Admin access required"}), 403
@@ -68,15 +68,39 @@ def delete_tag(tag_id):
     if not tag:
         return jsonify({"error": "Tag not found"}), 404
         
-    
-    for video in tag.videos:
-        video.tags.remove(tag)
+    if request.method == 'DELETE':
         
-    
-    db.session.delete(tag)
-    db.session.commit()
-    
-    return jsonify({"message": "Tag deleted successfully"}), 200
+        for video in tag.videos:
+            video.tags.remove(tag)
+            
+        
+        db.session.delete(tag)
+        db.session.commit()
+        
+        return jsonify({"message": "Tag deleted successfully"}), 200
+        
+    elif request.method == 'PUT':
+        
+        data = request.json
+        new_name = data.get('name')
+        
+        if not new_name:
+            return jsonify({"error": "Name is required"}), 400
+            
+        
+        tag.name = new_name
+        tag.slug = Tag.generate_slug(new_name)
+        
+        db.session.commit()
+        
+        
+        stmt = select(func.count()).select_from(video_tags).where(video_tags.c.tag_id == tag.id)
+        video_count = db.session.execute(stmt).scalar_one()
+        
+        tag_json = tag.json()
+        tag_json["video_count"] = video_count
+        
+        return jsonify(tag_json), 200
 
 
 def register_direct_routes(app_or_blueprint):

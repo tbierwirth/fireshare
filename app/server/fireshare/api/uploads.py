@@ -9,6 +9,7 @@ from subprocess import Popen
 from pathlib import Path
 
 from ..constants import SUPPORTED_FILE_TYPES
+from .. import util, db
 
 
 uploads_bp = Blueprint('uploads', __name__, url_prefix='/api/upload')
@@ -71,21 +72,60 @@ def public_upload_video():
     
     file.save(save_path)
     
+    # Create initial database records
+    from datetime import datetime
+    from ..models import Video, VideoInfo, VideoProcessingJob
     
-    cmd = f"fireshare scan-video --path=\"{save_path}\""
+    video_id = util.video_id(Path(save_path))
+    relative_path = str(Path(save_path).relative_to(paths['video']))
+    created_at = datetime.utcnow()
+    updated_at = created_at
     
+    # Create video record
+    video = Video(
+        video_id=video_id, 
+        extension=f".{filetype}", 
+        path=relative_path, 
+        available=True, 
+        created_at=created_at, 
+        updated_at=updated_at,
+        owner_id=None  # Public upload has no owner
+    )
+    db.session.add(video)
     
-    cmd += f" --game=\"{game}\""
+    # Create initial video info
+    info = VideoInfo(
+        video_id=video_id, 
+        title=Path(relative_path).stem, 
+        private=False  # Public uploads are public by default
+    )
+    db.session.add(info)
     
+    # Create processing job
+    job = VideoProcessingJob(video_id=video_id)
+    db.session.add(job)
+    db.session.commit()
     
-    if tags:
-        tag_list = ','.join(tags)
-        cmd += f" --tags=\"{tag_list}\""
-        
-    Popen(cmd, shell=True)
+    # Start processing
+    from ..worker import process_video
+    
+    # For development, we'll call the processing function directly
+    # In production, this would be enqueued in a task queue (like RQ)
+    tag_string = ','.join(tags) if tags else None
+    
+    # Process in the background
+    from threading import Thread
+    thread = Thread(
+        target=process_video, 
+        args=(video_id, game, tag_string, None)  # No owner for public uploads
+    )
+    thread.daemon = True
+    thread.start()
     
     return jsonify({
-        "message": "Video uploaded successfully", 
+        "message": "Video uploaded successfully",
+        "video_id": video_id,
+        "job_id": job.id,
         "tags": tags
     }), 201
 
@@ -143,27 +183,90 @@ def upload_video():
     
     file.save(save_path)
     
+    # Create initial database records
+    from datetime import datetime
+    from ..models import Video, VideoInfo, VideoProcessingJob
+
+    video_id = util.video_id(Path(save_path))
+    relative_path = str(Path(save_path).relative_to(paths['video']))
+    created_at = datetime.utcnow()
+    updated_at = created_at
     
-    cmd = f"fireshare scan-video --path=\"{save_path}\""
+    # Create video record
+    video = Video(
+        video_id=video_id, 
+        extension=f".{filetype}", 
+        path=relative_path, 
+        available=True, 
+        created_at=created_at, 
+        updated_at=updated_at,
+        owner_id=current_user.id
+    )
+    db.session.add(video)
     
+    # Create initial video info
+    info = VideoInfo(
+        video_id=video_id, 
+        title=Path(relative_path).stem, 
+        private=True  # Default to private
+    )
+    db.session.add(info)
     
-    cmd += f" --game=\"{game}\""
+    # Create processing job
+    job = VideoProcessingJob(video_id=video_id)
+    db.session.add(job)
+    db.session.commit()
     
+    # Start processing
+    from ..worker import process_video
     
-    if tags:
-        tag_list = ','.join(tags)
-        cmd += f" --tags=\"{tag_list}\""
-        
+    # For development, we'll call the processing function directly
+    # In production, this would be enqueued in a task queue (like RQ)
+    tag_string = ','.join(tags) if tags else None
     
-    cmd += f" --owner-id={current_user.id}"
-    
-    Popen(cmd, shell=True)
+    # Process in the background
+    from threading import Thread
+    thread = Thread(
+        target=process_video, 
+        args=(video_id, game, tag_string, current_user.id)
+    )
+    thread.daemon = True
+    thread.start()
     
     return jsonify({
         "message": "Video uploaded successfully",
+        "video_id": video_id,
+        "job_id": job.id,
         "tags": tags
     }), 201
 
+
+@uploads_bp.route('/status/<job_id>', methods=['GET'])
+def check_processing_status(job_id):
+    """Check the status of a video processing job"""
+    from ..models import VideoProcessingJob
+    
+    # Try to convert job_id to integer
+    try:
+        job_id = int(job_id)
+    except ValueError:
+        return jsonify({"error": "Invalid job ID format"}), 400
+        
+    # Query for the job
+    job = VideoProcessingJob.query.get(job_id)
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+        
+    # Return job status
+    return jsonify({
+        "job_id": job.id,
+        "video_id": job.video_id,
+        "status": job.status,
+        "progress": job.progress,
+        "error": job.error_message,
+        "created_at": job.created_at.isoformat() if job.created_at else None,
+        "updated_at": job.updated_at.isoformat() if job.updated_at else None
+    })
 
 def register_routes(app_or_blueprint):
     app_or_blueprint.register_blueprint(uploads_bp)

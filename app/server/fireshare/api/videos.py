@@ -235,14 +235,27 @@ def register_direct_routes(app_or_blueprint):
     
     @app_or_blueprint.route('/api/video/poster', methods=['GET'])
     def get_video_poster():
-        
         video_id = request.args['id']
         webm_poster_path = Path(current_app.config["PROCESSED_DIRECTORY"], "derived", video_id, "boomerang-preview.webm")
         jpg_poster_path = Path(current_app.config["PROCESSED_DIRECTORY"], "derived", video_id, "poster.jpg")
+        
+        # Check if this is a request for an animated poster
         if request.args.get('animated'):
-            return send_file(webm_poster_path, mimetype='video/webm')
+            # Check if the animated poster exists
+            if webm_poster_path.exists():
+                return send_file(webm_poster_path, mimetype='video/webm')
+            else:
+                # Return a default loading file or empty response
+                logging.info(f"Animated poster for {video_id} not found, still processing")
+                return Response(status=202)  # 202 Accepted - processing in progress
         else:
-            return send_file(jpg_poster_path, mimetype='image/jpg')
+            # Check if the static poster exists
+            if jpg_poster_path.exists():
+                return send_file(jpg_poster_path, mimetype='image/jpg')
+            else:
+                # Return a default loading image or empty response
+                logging.info(f"Static poster for {video_id} not found, still processing")
+                return Response(status=202)  # 202 Accepted - processing in progress
     
     @app_or_blueprint.route('/api/video/view', methods=['POST'])
     def add_video_view():

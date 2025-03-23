@@ -479,4 +479,38 @@ class VideoView(db.Model):
 
     def __repr__(self):
         return "<VideoViews {} {}>".format(self.video_id, self.ip_address)
+        
+class ProcessingStatus(enum.Enum):
+    QUEUED = "queued"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    
+class VideoProcessingJob(db.Model):
+    __tablename__ = "video_processing_job"
+    
+    id = db.Column(db.Integer, primary_key=True)
+    video_id = db.Column(db.String(32), db.ForeignKey("video.video_id"), nullable=False)
+    status = db.Column(db.String(20), default=ProcessingStatus.QUEUED.value)
+    progress = db.Column(db.Integer, default=0)  # 0-100
+    error_message = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    
+    # Relationships
+    video = db.relationship("Video", backref=db.backref("processing_jobs", lazy="dynamic"))
+    
+    def json(self):
+        return {
+            "id": self.id,
+            "video_id": self.video_id,
+            "status": self.status,
+            "progress": self.progress,
+            "error_message": self.error_message,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None
+        }
+        
+    def __repr__(self):
+        return f"<VideoProcessingJob {self.id} for video {self.video_id} - status: {self.status}>"
     

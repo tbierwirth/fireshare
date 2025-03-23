@@ -184,6 +184,12 @@ const service = {
   deleteTag(tagId) {
     return Api().delete(`/api/tags/${tagId}`);
   },
+  updateTag(tagId, name) {
+    return Api().put(`/api/tags/${tagId}`, { name });
+  },
+  updateGame(gameId, name) {
+    return Api().put(`/api/games/${gameId}`, { name });
+  },
   getFolders() {
     return dedupedFetch({
       method: "get",
@@ -194,6 +200,9 @@ const service = {
     return Api().put(`/api/video/${videoId}/folder`, {
       folder_id: folderId
     });
+  },
+  checkProcessingStatus(jobId) {
+    return Api().get(`/api/upload/status/${jobId}`);
   }
 };
 

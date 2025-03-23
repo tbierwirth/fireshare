@@ -123,8 +123,7 @@ const SliderWrapper = ({ cardSize, defaultCardSize, vertical, onChangeCommitted 
           { value: 100 },
         ]}
         aria-label="Card size"
-        valueLabelDisplay="auto"
-        valueLabelFormat={(value) => `${currentSizePx}px`}
+        valueLabelDisplay="off"
       />
       
       {}
