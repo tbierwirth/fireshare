@@ -23,7 +23,7 @@ import { useSetupWizard } from '../../contexts/SetupWizardContext';
 import { AuthService } from '../../services';
 
 // Setup wizard steps
-const steps = ['Welcome', 'Login', 'Create Admin', 'Complete'];
+const steps = ['Welcome', 'Create Admin', 'Complete'];
 
 const SetupWizard = () => {
   const { showSetupWizard, setupData, setupLoading, completeSetup, forceShowWizard } = useSetupWizard();
@@ -31,8 +31,6 @@ const SetupWizard = () => {
   
   // Local state for the wizard
   const [activeStep, setActiveStep] = useState(0);
-  const [defaultUsername, setDefaultUsername] = useState('admin');
-  const [defaultPassword, setDefaultPassword] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [email, setEmail] = useState('');
@@ -40,15 +38,8 @@ const SetupWizard = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [inviteCode, setInviteCode] = useState('');
 
-  // Update state when setup data changes
-  useEffect(() => {
-    if (setupData) {
-      setDefaultUsername(setupData.defaultUsername || 'admin');
-      setInviteCode(setupData.inviteCode || '');
-    }
-  }, [setupData]);
+  // Setup wizard mounts automatically when needed
 
   // Navigate between steps
   const handleNext = () => {
@@ -63,36 +54,14 @@ const SetupWizard = () => {
     setSuccess('');
   };
 
-  // Handle default admin login
-  const handleDefaultLogin = async () => {
-    setLoading(true);
-    setError('');
-    
-    try {
-      await login(defaultUsername, defaultPassword);
-      setSuccess('Successfully logged in with default admin account');
-      
-      // Auto-advance after successful login
-      setTimeout(() => {
-        handleNext();
-        setSuccess('');
-      }, 1000);
-    } catch (error) {
-      console.error('Login error:', error);
-      setError('Login failed. Please check your credentials and try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Handle registration of new admin account
-  const handleRegister = async () => {
+  // Handle creation of admin account during setup
+  const handleSetupAdmin = async () => {
     setLoading(true);
     setError('');
 
     // Validate form
     if (!username || !password || !confirmPassword) {
-      setError('All fields are required');
+      setError('Username and password are required');
       setLoading(false);
       return;
     }
@@ -102,15 +71,26 @@ const SetupWizard = () => {
       setLoading(false);
       return;
     }
+    
+    if (username.length < 3) {
+      setError('Username must be at least 3 characters');
+      setLoading(false);
+      return;
+    }
+    
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters');
+      setLoading(false);
+      return;
+    }
 
     try {
-      // Register using the invite code
-      await AuthService.register(username, password, email, inviteCode);
-      setSuccess('Successfully registered your admin account');
-
-      // Logout from default admin and login with new account
-      await logout();
-      await login(username, password);
+      // Create admin account using the setup endpoint
+      const response = await AuthService.setupAdmin(username, password, email);
+      setSuccess('Successfully created admin account');
+      
+      // After successful creation, refresh auth status
+      await refreshAuthStatus();
       
       // Auto-advance after successful registration
       setTimeout(() => {
@@ -118,8 +98,8 @@ const SetupWizard = () => {
         setSuccess('');
       }, 1000);
     } catch (error) {
-      console.error('Registration error:', error);
-      setError(error.response?.data || 'Registration failed. Please try again.');
+      console.error('Setup error:', error);
+      setError(error.response?.data || 'Setup failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -147,79 +127,25 @@ const SetupWizard = () => {
               You'll need to:
             </Typography>
             <Typography component="ol" sx={{ pl: 3 }}>
-              <li>Log in with the default admin account</li>
-              <li>Create your personal admin account</li>
-              <li>Complete the setup process</li>
+              <li>Create your admin account</li>
+              <li>Configure your application settings</li>
+              <li>Start uploading and sharing videos</li>
             </Typography>
             <Alert severity="info" sx={{ mt: 2 }}>
-              For security, after setup you should delete the default admin account.
+              After setup, you'll have full access to all admin features including user management, video uploads, and settings.
             </Alert>
           </Box>
         );
         
-      case 1: // Login
+      case 1: // Create Admin
         return (
           <Box sx={{ mt: 2 }}>
             <Typography variant="h6" gutterBottom>
-              Login with Default Admin Account
+              Create Your Admin Account
             </Typography>
             <Typography variant="body1" sx={{ mb: 2 }}>
-              Use the default admin credentials to log in. The default username is usually "admin".
+              This will be the main administrator account for your Fireshare instance.
             </Typography>
-            
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              label="Default Username"
-              value={defaultUsername}
-              onChange={(e) => setDefaultUsername(e.target.value)}
-              disabled={loading}
-              variant="outlined"
-            />
-            
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              label="Default Password"
-              type="password"
-              value={defaultPassword}
-              onChange={(e) => setDefaultPassword(e.target.value)}
-              disabled={loading}
-              variant="outlined"
-            />
-            
-            {error && (
-              <Alert severity="error" sx={{ mt: 2 }}>
-                {error}
-              </Alert>
-            )}
-            
-            {success && (
-              <Alert severity="success" sx={{ mt: 2 }}>
-                {success}
-              </Alert>
-            )}
-          </Box>
-        );
-        
-      case 2: // Create Admin
-        return (
-          <Box sx={{ mt: 2 }}>
-            <Typography variant="h6" gutterBottom>
-              Create Your Personal Admin Account
-            </Typography>
-            <Typography variant="body1" sx={{ mb: 2 }}>
-              Create your personal admin account that you'll use going forward.
-            </Typography>
-            
-            <Alert severity="info" sx={{ mb: 2 }}>
-              <AlertTitle>Your Setup Invite Code</AlertTitle>
-              <Typography sx={{ wordBreak: 'break-all', fontWeight: 'bold' }}>
-                {inviteCode}
-              </Typography>
-            </Alert>
             
             <TextField
               margin="normal"
@@ -230,6 +156,7 @@ const SetupWizard = () => {
               onChange={(e) => setUsername(e.target.value)}
               disabled={loading}
               variant="outlined"
+              helperText="Must be at least 3 characters"
             />
             
             <TextField
@@ -253,6 +180,7 @@ const SetupWizard = () => {
               onChange={(e) => setPassword(e.target.value)}
               disabled={loading}
               variant="outlined"
+              helperText="Must be at least 8 characters"
             />
             
             <TextField
@@ -263,17 +191,6 @@ const SetupWizard = () => {
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              disabled={loading}
-              variant="outlined"
-            />
-            
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              label="Invite Code"
-              value={inviteCode}
-              onChange={(e) => setInviteCode(e.target.value)}
               disabled={loading}
               variant="outlined"
             />
@@ -292,20 +209,27 @@ const SetupWizard = () => {
           </Box>
         );
         
-      case 3: // Complete
+      case 2: // Complete
         return (
           <Box sx={{ mt: 2 }}>
             <Typography variant="h6" gutterBottom>
               Setup Complete!
             </Typography>
             <Typography variant="body1" sx={{ mb: 2 }}>
-              You've successfully set up your Fireshare instance with your personal admin account.
+              You've successfully set up your Fireshare instance with your admin account.
             </Typography>
             
-            <Alert severity="warning" sx={{ mb: 2 }}>
-              <AlertTitle>Important Security Step</AlertTitle>
-              For security, you should delete the default admin account immediately.
-              After completing setup, you'll be redirected to the User Management page where you can do this.
+            <Alert severity="success" sx={{ mb: 2 }}>
+              <AlertTitle>What's Next?</AlertTitle>
+              <Typography>
+                You can now:
+              </Typography>
+              <ul>
+                <li>Configure your application settings</li>
+                <li>Upload and manage videos</li>
+                <li>Create invite codes for other users</li>
+                <li>Customize your Fireshare instance</li>
+              </ul>
             </Alert>
           </Box>
         );
@@ -332,7 +256,7 @@ const SetupWizard = () => {
           </>
         );
         
-      case 1: // Login
+      case 1: // Create Admin
         return (
           <>
             <Button
@@ -344,35 +268,15 @@ const SetupWizard = () => {
             <Box sx={{ flex: '1 1 auto' }} />
             <Button
               variant="contained"
-              onClick={handleDefaultLogin}
-              disabled={loading || !defaultUsername || !defaultPassword}
+              onClick={handleSetupAdmin}
+              disabled={loading || !username || !password || !confirmPassword}
             >
-              {loading ? <CircularProgress size={24} /> : 'Login'}
+              {loading ? <CircularProgress size={24} /> : 'Create Admin Account'}
             </Button>
           </>
         );
         
-      case 2: // Create Admin
-        return (
-          <>
-            <Button
-              disabled={loading}
-              onClick={handleBack}
-            >
-              Back
-            </Button>
-            <Box sx={{ flex: '1 1 auto' }} />
-            <Button
-              variant="contained"
-              onClick={handleRegister}
-              disabled={loading || !username || !password || !confirmPassword || !inviteCode}
-            >
-              {loading ? <CircularProgress size={24} /> : 'Create Account'}
-            </Button>
-          </>
-        );
-        
-      case 3: // Complete
+      case 2: // Complete
         return (
           <>
             <Button
@@ -387,7 +291,7 @@ const SetupWizard = () => {
               onClick={handleComplete}
               disabled={loading}
             >
-              Complete Setup
+              Get Started
             </Button>
           </>
         );

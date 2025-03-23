@@ -26,6 +26,14 @@ class AuthService {
       invite_code: inviteCode
     });
   }
+  
+  setupAdmin(username, password, email) {
+    return Api().post("/api/setup/admin", {
+      username: username,
+      password: password,
+      email: email
+    });
+  }
   getProfile() {
     return dedupedFetch({
       method: "get",

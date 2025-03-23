@@ -72,8 +72,8 @@ export const SetupWizardProvider = ({ children }) => {
     // Invalidate the setup status query to force a refetch
     queryClient.invalidateQueries(['setup', 'status']);
     
-    // Navigate to users page to delete default admin
-    navigate('/users');
+    // Navigate to dashboard
+    navigate('/my/videos');
   };
   
   // Dismiss the wizard (for testing/development only)

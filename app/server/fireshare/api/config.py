@@ -112,7 +112,7 @@ def register_direct_routes(app_or_blueprint):
         It helps the UI determine if this is a fresh installation that needs setup.
         """
         from sqlalchemy import select, func
-        from ..models import User, InviteCode
+        from ..models import User
         import logging
         
         logger = logging.getLogger('fireshare')
@@ -121,47 +121,23 @@ def register_direct_routes(app_or_blueprint):
         setup_mode = current_app.config.get('SETUP_MODE', False)
         logger.info(f"Setup status check: SETUP_MODE = {setup_mode}")
         
-        # Alternative check - count users
+        # Count users
         user_count = db.session.execute(select(func.count()).select_from(User)).scalar_one()
         logger.info(f"Setup status check: User count = {user_count}")
         
-        # Get the setup invite code if available
-        setup_invite_code = current_app.config.get('SETUP_INVITE_CODE', None)
-        
-        # If we don't have a stored invite code but we're in setup mode, find one
-        if not setup_invite_code and (setup_mode or user_count <= 1):
-            # Look for any active invite code
-            try:
-                invite = db.session.execute(
-                    select(InviteCode)
-                    .filter_by(used_by_id=None)
-                    .filter(InviteCode.expires_at > db.func.current_timestamp())
-                    .order_by(InviteCode.created_at.desc())
-                ).scalar_one_or_none()
-                
-                if invite:
-                    setup_invite_code = invite.code
-                    current_app.config['SETUP_INVITE_CODE'] = setup_invite_code
-                    logger.info(f"Found invite code for setup: {setup_invite_code}")
-            except Exception as e:
-                logger.error(f"Error finding invite code: {str(e)}")
-                
         # Determine if we need setup based on user count or explicit flag
-        needs_setup = setup_mode or user_count <= 1
+        needs_setup = setup_mode or user_count == 0
         logger.info(f"Setup status check: needs_setup = {needs_setup}")
                 
-        # Only return detailed information if we actually need setup
+        # Return setup status
         response = {}
         if needs_setup:
             response = {
                 "needsSetup": True,
-                "inviteCode": setup_invite_code,
-                "defaultUsername": current_app.config.get('SETUP_USERNAME', 'admin'),
-                "isDefaultAdminUser": True,
                 "setupSteps": [
-                    "Log in with the default admin account",
-                    "Register your personal admin account using the invite code",
-                    "Delete the default admin account for security"
+                    "Create your admin account",
+                    "Configure basic application settings",
+                    "Start uploading videos"
                 ]
             }
         else:

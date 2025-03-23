@@ -127,10 +127,79 @@ def login():
     
     return Response(response="Invalid username or password", status=401)
 
+@auth.route('/api/setup/admin', methods=['POST'])
+def setup_admin():
+    """
+    Create the initial admin account during first-time setup.
+    This endpoint is only available when the application has no users.
+    """
+    from sqlalchemy import select, func
+    
+    # Check if any users exist
+    user_count = db.session.execute(select(func.count()).select_from(User)).scalar_one()
+    
+    # Only allow creating the admin if no users exist
+    if user_count > 0:
+        return Response(response="Setup already completed. Use regular registration.", status=403)
+    
+    username = request.json.get('username')
+    password = request.json.get('password')
+    email = request.json.get('email')
+    
+    if not username or not password:
+        return Response(response="Username and password are required", status=400)
+    
+    # Validate username and password
+    if len(username) < 3:
+        return Response(response="Username must be at least 3 characters", status=400)
+    
+    if len(password) < 8:
+        return Response(response="Password must be at least 8 characters", status=400)
+    
+    # Check if username is available
+    stmt = select(User).filter_by(username=username)
+    existing_user = db.session.execute(stmt).scalar_one_or_none()
+    if existing_user:
+        return Response(response="Username already exists", status=400)
+    
+    # Check if email is available (if provided)
+    if email:
+        stmt = select(User).filter_by(email=email)
+        existing_email = db.session.execute(stmt).scalar_one_or_none()
+        if existing_email:
+            return Response(response="Email already exists", status=400)
+    
+    # Create the admin user
+    admin_user = User(
+        username=username, 
+        password=generate_password_hash(password),
+        email=email,
+        role=UserRole.ADMIN.value,
+        admin=True,
+        status=UserStatus.ACTIVE.value
+    )
+
+    db.session.add(admin_user)
+    db.session.commit()
+    
+    # Turn off setup mode
+    current_app.config['SETUP_MODE'] = False
+    
+    # Log in the new admin user
+    login_user(admin_user, remember=True)
+
+    return jsonify({
+        "user": admin_user.json(),
+        "isAdmin": admin_user.is_admin(),
+        "setupComplete": True
+    })
+
 @auth.route('/api/signup', methods=['POST'])
 @login_required
 def signup():
-    
+    """
+    Create a new user account (requires admin privileges).
+    """
     if not current_user.is_admin():
         return Response(response="Administrator privileges required", status=403)
         
@@ -141,8 +210,6 @@ def signup():
     
     if not username or not password:
         return Response(response="Username and password are required", status=400)
-
-    
     
     stmt = select(User).filter_by(username=username)
     existing_user = db.session.execute(stmt).scalar_one_or_none()
@@ -150,12 +217,10 @@ def signup():
         return Response(response="Username already exists", status=400)
     
     if email:
-        
         stmt = select(User).filter_by(email=email)
         existing_email = db.session.execute(stmt).scalar_one_or_none()
         if existing_email:
             return Response(response="Email already exists", status=400)
-    
     
     new_user = User(
         username=username, 
