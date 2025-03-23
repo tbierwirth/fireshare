@@ -21,6 +21,8 @@ import { getSetting } from './common/utils'
 import AuthWrapper from './components/utils/AuthWrapper'
 import Navbar20 from './components/nav/Navbar20'
 import { AuthProvider, ConfigProvider } from './contexts'
+import { SetupWizardProvider } from './contexts/SetupWizardContext'
+import SetupWizard from './components/setup/SetupWizard'
 import ErrorBoundary from './components/utils/ErrorBoundary'
 
 
@@ -68,25 +70,30 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <ConfigProvider>
-            <Router>
-              <ThemeProvider theme={muitheme}>
-                <CssBaseline />
-              <Routes>
-                {}
-                <Route
-                  path="/"
-                  element={
-                    <AuthWrapper>
-                      <Navbar20 page="/" collapsed={!drawerOpen} searchable styleToggle cardSlider>
-                        {(props) => (
-                          <ErrorBoundary>
-                            <Feed key="feed-home" {...props} />
-                          </ErrorBoundary>
-                        )}
-                      </Navbar20>
-                    </AuthWrapper>
-                  }
-                />
+          <Router>
+            <ThemeProvider theme={muitheme}>
+              <CssBaseline />
+              {/* Setup Wizard Provider must be inside Router for navigation */}
+              <SetupWizardProvider>
+                {/* Setup Wizard component shows automatically when needed */}
+                <SetupWizard />
+                
+                <Routes>
+                  {}
+                  <Route
+                    path="/"
+                    element={
+                      <AuthWrapper>
+                        <Navbar20 page="/" collapsed={!drawerOpen} searchable styleToggle cardSlider>
+                          {(props) => (
+                            <ErrorBoundary>
+                              <Feed key="feed-home" {...props} />
+                            </ErrorBoundary>
+                          )}
+                        </Navbar20>
+                      </AuthWrapper>
+                    }
+                  />
                 {}
                 <Route
                   path="/my/videos"
@@ -186,10 +193,11 @@ export default function App() {
                   }
                 />
               </Routes>
+              </SetupWizardProvider>
             </ThemeProvider>
           </Router>
-      </ConfigProvider>
-    </AuthProvider>
+        </ConfigProvider>
+      </AuthProvider>
     </QueryClientProvider>
   )
 }
