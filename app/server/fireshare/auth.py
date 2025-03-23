@@ -365,7 +365,7 @@ def change_password():
         return Response(response="Current password is incorrect", status=400)
     
     
-    current_user.password = generate_password_hash(new_password, method='sha256')
+    current_user.password = generate_password_hash(new_password)
     db.session.commit()
     
     return Response(status=200)
