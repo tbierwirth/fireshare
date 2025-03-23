@@ -18,17 +18,25 @@ depends_on = None
 
 def upgrade():
     # Create the video_processing_job table only
-    op.create_table('video_processing_job',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('video_id', sa.String(length=32), nullable=False),
-        sa.Column('status', sa.String(length=20), nullable=True),
-        sa.Column('progress', sa.Integer(), nullable=True),
-        sa.Column('error_message', sa.Text(), nullable=True),
-        sa.Column('created_at', sa.DateTime(), nullable=True),
-        sa.Column('updated_at', sa.DateTime(), nullable=True),
-        sa.ForeignKeyConstraint(['video_id'], ['video.video_id'], ),
-        sa.PrimaryKeyConstraint('id')
-    )
+    # Add SQLite-compatible error handling to skip if table exists
+    try:
+        op.create_table('video_processing_job',
+            sa.Column('id', sa.Integer(), nullable=False),
+            sa.Column('video_id', sa.String(length=32), nullable=False),
+            sa.Column('status', sa.String(length=20), nullable=True),
+            sa.Column('progress', sa.Integer(), nullable=True),
+            sa.Column('error_message', sa.Text(), nullable=True),
+            sa.Column('created_at', sa.DateTime(), nullable=True),
+            sa.Column('updated_at', sa.DateTime(), nullable=True),
+            sa.ForeignKeyConstraint(['video_id'], ['video.video_id'], ),
+            sa.PrimaryKeyConstraint('id')
+        )
+    except Exception as e:
+        # Skip if table already exists (SQLite compatibility)
+        if "already exists" in str(e):
+            pass
+        else:
+            raise
 
 
 def downgrade():

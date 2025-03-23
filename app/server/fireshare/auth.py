@@ -58,7 +58,7 @@ auth = Blueprint('auth', __name__)
 CORS(auth, supports_credentials=True)
 
 def generate_invite_code():
-    
+    """Admin creates a new user account directly"""
     alphabet = string.ascii_letters + string.digits
     code = ''.join(secrets.choice(alphabet) for _ in range(16))
     return code
