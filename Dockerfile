@@ -24,6 +24,10 @@ COPY app/nginx/prod.conf /etc/nginx/nginx.conf
 COPY app/server/ /app/server
 COPY migrations/ /migrations
 COPY --from=client /app/build /app/build
+# Create a fix-api-init script to repair corrupted __init__.py file if needed
+COPY app/server/fireshare/api/__init__.py /tmp/correct_init.py
+RUN echo '#!/bin/bash\nmkdir -p /usr/local/lib/python3.9/site-packages/fireshare/api/\ncp /tmp/correct_init.py /usr/local/lib/python3.9/site-packages/fireshare/api/__init__.py' > /fix-api-init.sh && chmod +x /fix-api-init.sh
+
 RUN pip install --no-cache-dir /app/server
 
 ENV FLASK_APP /app/server/fireshare:create_app()

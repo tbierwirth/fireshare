@@ -4,6 +4,7 @@ from flask import Blueprint, request, jsonify, Response, current_app
 from flask_login import login_required, current_user
 from ..models import User
 from sqlalchemy import select
+from .. import db
 
 
 config_bp = Blueprint('config', __name__, url_prefix='/api/config')
@@ -102,6 +103,58 @@ def register_direct_routes(app_or_blueprint):
             return jsonify({})
         else:
             return jsonify(warnings)
+    
+    @app_or_blueprint.route('/api/setup/status', methods=["GET"])
+    def get_setup_status():
+        """
+        Returns the setup status of the application.
+        This endpoint is public and does not require authentication.
+        It helps the UI determine if this is a fresh installation that needs setup.
+        """
+        from sqlalchemy import select, func
+        from ..models import User, InviteCode
+        
+        # Check if we're in setup mode
+        setup_mode = current_app.config.get('SETUP_MODE', False)
+        
+        # Alternative check - count users
+        user_count = db.session.execute(select(func.count()).select_from(User)).scalar_one()
+        
+        # Get the setup invite code if available
+        setup_invite_code = current_app.config.get('SETUP_INVITE_CODE', None)
+        
+        # If we don't have a stored invite code but we're in setup mode, find one
+        if not setup_invite_code and (setup_mode or user_count <= 1):
+            # Look for any active invite code
+            invite = db.session.execute(
+                select(InviteCode)
+                .filter_by(used_by_id=None)
+                .filter(InviteCode.expires_at > db.func.current_timestamp())
+                .order_by(InviteCode.created_at.desc())
+            ).scalar_one_or_none()
+            
+            if invite:
+                setup_invite_code = invite.code
+                current_app.config['SETUP_INVITE_CODE'] = setup_invite_code
+                
+        # Determine if we need setup based on user count or explicit flag
+        needs_setup = setup_mode or user_count <= 1
+                
+        # Only return detailed information if we actually need setup
+        if needs_setup:
+            return jsonify({
+                "needsSetup": True,
+                "inviteCode": setup_invite_code,
+                "defaultUsername": current_app.config.get('SETUP_USERNAME', 'admin'),
+                "isDefaultAdminUser": True,
+                "setupSteps": [
+                    "Log in with the default admin account",
+                    "Register your personal admin account using the invite code",
+                    "Delete the default admin account for security"
+                ]
+            })
+        else:
+            return jsonify({"needsSetup": False})
     
     @app_or_blueprint.route('/api/manual/scan')
     @login_required
