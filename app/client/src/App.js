@@ -23,6 +23,7 @@ import Navbar20 from './components/nav/Navbar20'
 import { AuthProvider, ConfigProvider } from './contexts'
 import { SetupWizardProvider } from './contexts/SetupWizardContext'
 import SetupWizard from './components/setup/SetupWizard'
+import SetupDebug from './components/setup/SetupDebug'
 import ErrorBoundary from './components/utils/ErrorBoundary'
 
 
@@ -77,6 +78,8 @@ export default function App() {
               <SetupWizardProvider>
                 {/* Setup Wizard component shows automatically when needed */}
                 <SetupWizard />
+                {/* Debug component for testing - remove before production */}
+                <SetupDebug />
                 
                 <Routes>
                   {}

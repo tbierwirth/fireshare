@@ -113,12 +113,17 @@ def register_direct_routes(app_or_blueprint):
         """
         from sqlalchemy import select, func
         from ..models import User, InviteCode
+        import logging
+        
+        logger = logging.getLogger('fireshare')
         
         # Check if we're in setup mode
         setup_mode = current_app.config.get('SETUP_MODE', False)
+        logger.info(f"Setup status check: SETUP_MODE = {setup_mode}")
         
         # Alternative check - count users
         user_count = db.session.execute(select(func.count()).select_from(User)).scalar_one()
+        logger.info(f"Setup status check: User count = {user_count}")
         
         # Get the setup invite code if available
         setup_invite_code = current_app.config.get('SETUP_INVITE_CODE', None)
@@ -126,23 +131,29 @@ def register_direct_routes(app_or_blueprint):
         # If we don't have a stored invite code but we're in setup mode, find one
         if not setup_invite_code and (setup_mode or user_count <= 1):
             # Look for any active invite code
-            invite = db.session.execute(
-                select(InviteCode)
-                .filter_by(used_by_id=None)
-                .filter(InviteCode.expires_at > db.func.current_timestamp())
-                .order_by(InviteCode.created_at.desc())
-            ).scalar_one_or_none()
-            
-            if invite:
-                setup_invite_code = invite.code
-                current_app.config['SETUP_INVITE_CODE'] = setup_invite_code
+            try:
+                invite = db.session.execute(
+                    select(InviteCode)
+                    .filter_by(used_by_id=None)
+                    .filter(InviteCode.expires_at > db.func.current_timestamp())
+                    .order_by(InviteCode.created_at.desc())
+                ).scalar_one_or_none()
+                
+                if invite:
+                    setup_invite_code = invite.code
+                    current_app.config['SETUP_INVITE_CODE'] = setup_invite_code
+                    logger.info(f"Found invite code for setup: {setup_invite_code}")
+            except Exception as e:
+                logger.error(f"Error finding invite code: {str(e)}")
                 
         # Determine if we need setup based on user count or explicit flag
         needs_setup = setup_mode or user_count <= 1
+        logger.info(f"Setup status check: needs_setup = {needs_setup}")
                 
         # Only return detailed information if we actually need setup
+        response = {}
         if needs_setup:
-            return jsonify({
+            response = {
                 "needsSetup": True,
                 "inviteCode": setup_invite_code,
                 "defaultUsername": current_app.config.get('SETUP_USERNAME', 'admin'),
@@ -152,9 +163,12 @@ def register_direct_routes(app_or_blueprint):
                     "Register your personal admin account using the invite code",
                     "Delete the default admin account for security"
                 ]
-            })
+            }
         else:
-            return jsonify({"needsSetup": False})
+            response = {"needsSetup": False}
+            
+        logger.info(f"Setup status response: {response}")
+        return jsonify(response)
     
     @app_or_blueprint.route('/api/manual/scan')
     @login_required

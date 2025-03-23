@@ -18,18 +18,26 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
 RUN adduser --disabled-password --gecos '' nginx
 RUN ln -sf /dev/stdout /var/log/nginx/access.log \
     && ln -sf /dev/stderr /var/log/nginx/error.log
-RUN mkdir /data && mkdir /processed
+# Create directories with proper permissions
+RUN mkdir -p /data /processed /videos /backups
 COPY entrypoint.sh /
 COPY app/nginx/prod.conf /etc/nginx/nginx.conf
 COPY app/server/ /app/server
 COPY migrations/ /migrations
 COPY --from=client /app/build /app/build
-# Create a fix-api-init script to repair corrupted __init__.py file if needed
+
+# Create helpful scripts for container setup and recovery
+# 1. Script to fix corrupted API module
 COPY app/server/fireshare/api/__init__.py /tmp/correct_init.py
 RUN echo '#!/bin/bash\nmkdir -p /usr/local/lib/python3.9/site-packages/fireshare/api/\ncp /tmp/correct_init.py /usr/local/lib/python3.9/site-packages/fireshare/api/__init__.py' > /fix-api-init.sh && chmod +x /fix-api-init.sh
 
+# 2. Script to back up the database (useful for debugging or recovery)
+RUN echo '#!/bin/bash\nBACKUP_DIR=/backups\nDATETIME=$(date +%Y%m%d_%H%M%S)\necho "Creating backup of database"\ncp /data/db.sqlite $BACKUP_DIR/db_backup_$DATETIME.sqlite\necho "Backup created at $BACKUP_DIR/db_backup_$DATETIME.sqlite"\n' > /backup-db.sh && chmod +x /backup-db.sh
+
+# Install the application
 RUN pip install --no-cache-dir /app/server
 
+# Set environment variables
 ENV FLASK_APP /app/server/fireshare:create_app()
 ENV FLASK_ENV production
 ENV ENVIRONMENT production
@@ -38,6 +46,9 @@ ENV VIDEO_DIRECTORY /videos
 ENV PROCESSED_DIRECTORY /processed
 ENV TEMPLATE_PATH=/app/server/fireshare/templates
 ENV ADMIN_PASSWORD admin
+
+# Enable setup mode by default for first-time installations
+ENV SETUP_MODE true
 
 EXPOSE 80
 CMD ["bash", "/entrypoint.sh"]

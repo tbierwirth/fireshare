@@ -26,7 +26,7 @@ import { AuthService } from '../../services';
 const steps = ['Welcome', 'Login', 'Create Admin', 'Complete'];
 
 const SetupWizard = () => {
-  const { showSetupWizard, setupData, setupLoading, completeSetup } = useSetupWizard();
+  const { showSetupWizard, setupData, setupLoading, completeSetup, forceShowWizard } = useSetupWizard();
   const { login, isLoggedIn, logout, refreshAuthStatus } = useAuth();
   
   // Local state for the wizard
@@ -401,13 +401,28 @@ const SetupWizard = () => {
     return null;
   }
 
+  // Log the state of the setup wizard for debugging
+  console.log('Setup Wizard render', { 
+    showSetupWizard, 
+    setupData, 
+    setupLoading, 
+    activeStep 
+  });
+
   return (
     <Dialog 
       open={showSetupWizard} 
       maxWidth="md" 
       fullWidth 
       disableEscapeKeyDown
-      disableBackdropClick
+      // MUI v5 no longer supports disableBackdropClick
+      onClose={(event, reason) => {
+        // Prevent dialog from closing when backdrop is clicked
+        if (reason === 'backdropClick') {
+          return;
+        }
+      }}
+      sx={{ zIndex: 9999 }} // Ensure dialog appears above everything
     >
       <DialogTitle sx={{ pb: 1 }}>
         <Typography variant="h5" component="div" align="center">

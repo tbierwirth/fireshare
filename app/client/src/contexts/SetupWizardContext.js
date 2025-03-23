@@ -22,8 +22,8 @@ export const SetupWizardProvider = ({ children }) => {
   const { isLoggedIn, isLoading: authLoading, user } = useAuth();
   const navigate = useNavigate();
   
-  // State for the setup wizard
-  const [showSetupWizard, setShowSetupWizard] = useState(false);
+  // State for the setup wizard - default to show on fresh installs
+  const [showSetupWizard, setShowSetupWizard] = useState(true); // Start with true to ensure it shows initially
   const [setupComplete, setSetupComplete] = useState(false);
   
   // Fetch setup status using the query hook
@@ -33,20 +33,30 @@ export const SetupWizardProvider = ({ children }) => {
     error: setupError,
     refetch: refetchSetupStatus
   } = useSetupStatus({
-    // Don't refetch if setup is complete
-    enabled: !setupComplete
+    // Always enable the setup status check, regardless of setupComplete state
+    enabled: true,
+    // Make this explicitly false to prevent potential query key issues
+    throwOnError: false
   });
   
   // Determine if setup is needed
   useEffect(() => {
-    if (!setupLoading && !authLoading && setupData) {
+    console.log('Setup effect running', {
+      setupLoading, 
+      authLoading, 
+      setupData, 
+      needsSetup: setupData?.needsSetup,
+      setupComplete
+    });
+    
+    if (!setupLoading && setupData) {
       const needsSetup = setupData.needsSetup === true;
       
       // Only show the setup wizard if:
       // 1. The application needs setup
       // 2. Setup is not already complete
-      // 3. User is not in the middle of the setup flow
       if (needsSetup && !setupComplete) {
+        console.log('Showing setup wizard');
         setShowSetupWizard(true);
       } else {
         setShowSetupWizard(false);
@@ -68,7 +78,14 @@ export const SetupWizardProvider = ({ children }) => {
   
   // Dismiss the wizard (for testing/development only)
   const dismissSetupWizard = () => {
+    console.log('Dismissing setup wizard');
     setShowSetupWizard(false);
+  };
+  
+  // Force show wizard (for testing/development only)
+  const forceShowWizard = () => {
+    console.log('Force showing setup wizard');
+    setShowSetupWizard(true);
   };
   
   // Context value
@@ -80,6 +97,7 @@ export const SetupWizardProvider = ({ children }) => {
     setupComplete,
     completeSetup,
     dismissSetupWizard,
+    forceShowWizard,
     refetchSetupStatus
   };
   
