@@ -22,18 +22,12 @@ def check_setup_status():
     """
     from sqlalchemy import select, func
     from .models import User
-    import logging
-    
-    logger = logging.getLogger('fireshare')
     
     # Check if ANY users exist
     user_count = db.session.execute(select(func.count()).select_from(User)).scalar_one()
     
     # First-time setup - no users at all
     if user_count == 0:
-        logger.info(f"===== FIRST-TIME SETUP REQUIRED =====")
-        logger.info(f"No users found - application is in setup mode")
-        
         # Enable setup mode
         current_app.config['SETUP_MODE'] = True
         
@@ -42,7 +36,6 @@ def check_setup_status():
         if setup_warning not in current_app.config['WARNINGS']:
             current_app.config['WARNINGS'].append(setup_warning)
         
-        logger.info(f"Application is ready for first-time setup")
         return True
     else:
         # Application already has users, so no setup needed
@@ -56,7 +49,7 @@ def before_request():
     This only runs once on the first request.
     """
     if not getattr(current_app, '_setup_checked', False):
-        check_setup_status()
+        needs_setup = check_setup_status()
         current_app._setup_checked = True
 
 
@@ -64,4 +57,6 @@ def before_request():
 @main.route('/#/<path:path>')
 def index(path):
     return render_template('index.html')
+
+# Setup endpoints moved to dedicated setup.py module
 

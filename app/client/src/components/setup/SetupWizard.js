@@ -90,7 +90,11 @@ const SetupWizard = () => {
       setSuccess('Successfully created admin account');
       
       // After successful creation, refresh auth status
-      await refreshAuthStatus();
+      try {
+        await refreshAuthStatus();
+      } catch (refreshError) {
+        // Continue even if the auth refresh fails
+      }
       
       // Auto-advance after successful registration
       setTimeout(() => {
@@ -98,8 +102,14 @@ const SetupWizard = () => {
         setSuccess('');
       }, 1000);
     } catch (error) {
-      console.error('Setup error:', error);
-      setError(error.response?.data || 'Setup failed. Please try again.');
+      // Error reporting
+      if (error.response) {
+        setError(error.response.data || 'Setup failed. Please try again.');
+      } else if (error.request) {
+        setError('No response received from server. Please try again.');
+      } else {
+        setError(error.message || 'Setup failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -107,8 +117,20 @@ const SetupWizard = () => {
 
   // Handle setup completion
   const handleComplete = () => {
+    // Clear any cached setup status
+    try {
+      sessionStorage.removeItem('app.tanstack.query.queries.["setup","status"]');
+    } catch (e) {
+      console.log('Could not clear cached setup status:', e);
+    }
+    
+    // Refresh auth status
     refreshAuthStatus();
+    
+    // Complete setup in the context - this calls the server
     completeSetup();
+    
+    console.log('Setup wizard completed - setup status now tracked server-side');
   };
 
   // Content for each step
@@ -301,17 +323,12 @@ const SetupWizard = () => {
     }
   };
 
-  if (!showSetupWizard) {
+  // Don't show setup wizard if:
+  // 1. It's not explicitly enabled via context
+  // 2. User is already logged in (this is a critical check)
+  if (!showSetupWizard || isLoggedIn) {
     return null;
   }
-
-  // Log the state of the setup wizard for debugging
-  console.log('Setup Wizard render', { 
-    showSetupWizard, 
-    setupData, 
-    setupLoading, 
-    activeStep 
-  });
 
   return (
     <Dialog 

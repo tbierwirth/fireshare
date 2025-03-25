@@ -182,17 +182,7 @@ function Navbar20({
   const { user, logout, isAdmin: authContextIsAdmin } = useAuth();
   
   
-  React.useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log("Navbar initial state:", {
-        authenticated,
-        collapsed,
-        storedDrawerState,
-        calculatedOpenState: shouldBeOpen,
-        stateOpen: open
-      });
-    }
-  }, [authenticated, collapsed, storedDrawerState, shouldBeOpen, open]);
+  // Initial state logging removed
   
   
   React.useEffect(() => {

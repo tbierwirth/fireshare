@@ -39,7 +39,6 @@ const SliderWrapper = ({ cardSize, defaultCardSize, vertical, onChangeCommitted 
     
     document.documentElement.style.setProperty('--card-size', `${sizePx}px`);
     
-    
   };
   
   
@@ -47,15 +46,15 @@ const SliderWrapper = ({ cardSize, defaultCardSize, vertical, onChangeCommitted 
     
     const finalSizePx = Math.round(SIZE_MIN + ((SIZE_MAX - SIZE_MIN) * (finalValue / 100)));
     
-    
+    // Store in localStorage
     localStorage.setItem('cardSize', finalSizePx.toString());
     
-    
-    
-    
+    // Call parent callback
     if (typeof onChangeCommitted === 'function') {
       onChangeCommitted(event, finalValue);
     }
+    
+    console.log(`SliderWrapper: Size committed to ${finalSizePx}px`);
   };
   
   

@@ -5,10 +5,9 @@ import VideoModal from '../modal/VideoModal'
 import VideoListItem from './VideoListItem'
 import SensorsIcon from '@mui/icons-material/Sensors'
 import { VideoService } from '../../services'
-import UploadCard from './UploadCard'
-import { VideoListSkeleton } from '../utils/SkeletonLoader'
+import { VideoListSkeleton } from './SkeletonLoader'
 import { useLoadingState, useOptimisticUI } from '../../hooks'
-
+import UploadButton from '../misc/UploadButton'
 
 const SESSION_KEY_VIDEO_LIST = 'component:videoList:hasShownVideos'
 
@@ -127,10 +126,9 @@ const VideoList = ({ videos, loadingIcon = null, feedView = false, authenticated
       </Grid>
       {!loadingIcon && (
         <Grid container justifyContent="center">
-          <UploadCard
+          <UploadButton 
             authenticated={authenticated}
             feedView={feedView}
-            cardWidth={250}
             handleAlert={memoizedHandleAlert}
             publicUpload={feedView}
           />

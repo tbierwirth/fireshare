@@ -21,14 +21,24 @@ videos_bp = Blueprint('videos', __name__, url_prefix='/api/videos')
 @login_required
 def get_videos():
     
-    sort = request.args.get('sort')
+    sort = request.args.get('sort', 'updated_at desc')
     
+    # Map intuitive sort options to SQL sort expressions
+    sort_mapping = {
+        'newest': 'updated_at desc',
+        'oldest': 'updated_at asc',
+        'a-z': 'title asc',
+        'z-a': 'title desc'
+    }
     
-    if "views" in sort:
+    # Apply mapping if a friendly sort option is used
+    sql_sort = sort_mapping.get(sort, sort)
+    
+    if sort and "views" in sort:
         stmt = select(Video).join(VideoInfo)
         videos = db.session.execute(stmt).scalars().all()
     else:
-        stmt = select(Video).join(VideoInfo).order_by(text(sort))
+        stmt = select(Video).join(VideoInfo).order_by(text(sql_sort))
         videos = db.session.execute(stmt).scalars().all()
 
     videos_json = []
@@ -52,24 +62,43 @@ def get_videos():
 @login_required
 def get_my_videos():
     
-    sort = request.args.get('sort')
+    sort = request.args.get('sort', 'newest')
     
+    # Map intuitive sort options to SQL sort expressions
+    sort_mapping = {
+        'newest': 'updated_at desc',
+        'oldest': 'updated_at asc',
+        'a-z': 'title asc',
+        'z-a': 'title desc'
+    }
     
-    logging.info(f"get_my_videos called by user {current_user.username} with sort={sort}")
-    logging.info(f"User authenticated: {current_user.is_authenticated}, Admin: {current_user.is_admin if hasattr(current_user, 'is_admin') else 'N/A'}")
+    # Apply mapping if a friendly sort option is used
+    sql_sort = sort_mapping.get(sort, sort)
+    
+    logging.info(f"get_my_videos called by user {current_user.username} with sort={sort} (SQL sort: {sql_sort})")
+    logging.info(f"User authenticated: {current_user.is_authenticated}, Admin: {current_user.is_admin() if hasattr(current_user, 'is_admin') else 'N/A'}")
     
     try:
+        # Get the current user's ID
+        user_id = current_user.id
         
+        # First, debug all videos to check if they exist in the database
+        all_videos_stmt = select(Video)
+        all_videos = db.session.execute(all_videos_stmt).scalars().all()
+        logging.info(f"DEBUG: Total videos in database: {len(all_videos)}")
+        for v in all_videos:
+            logging.info(f"DEBUG: Video ID: {v.video_id}, Owner ID: {v.owner_id}, Game: {v.game.name if v.game else 'None'}")
         
-        if "views" in sort:
-            stmt = select(Video).join(VideoInfo)
+        # Filter videos by owner_id (the current user)
+        if sort and "views" in sort:
+            stmt = select(Video).join(VideoInfo).filter(Video.owner_id == user_id)
             videos = db.session.execute(stmt).scalars().all()
         else:
-            stmt = select(Video).join(VideoInfo).order_by(text(sort))
+            stmt = select(Video).join(VideoInfo).filter(Video.owner_id == user_id).order_by(text(sql_sort))
             videos = db.session.execute(stmt).scalars().all()
 
         
-        logging.info(f"Found {len(videos)} videos in database for My Videos")
+        logging.info(f"Found {len(videos)} videos in database for user {current_user.username} (ID: {user_id})")
         
         videos_json = []
         for v in videos:
@@ -83,7 +112,7 @@ def get_my_videos():
             videos_json = sorted(videos_json, key=lambda d: d['view_count'], reverse=True)
 
         
-        logging.info(f"get_my_videos returning {len(videos_json)} videos")
+        logging.info(f"get_my_videos returning {len(videos_json)} videos for user {current_user.username}")
         
         
         return jsonify({"videos": videos_json})
@@ -95,20 +124,43 @@ def get_my_videos():
 @videos_bp.route('/public', methods=['GET'])
 def get_public_videos():
     
-    sort = request.args.get('sort')
+    sort = request.args.get('sort', 'newest')
     
+    # Map intuitive sort options to SQL sort expressions
+    sort_mapping = {
+        'newest': 'updated_at desc',
+        'oldest': 'updated_at asc',
+        'a-z': 'title asc',
+        'z-a': 'title desc'
+    }
     
-    if "views" in sort:
-        stmt = select(Video).join(VideoInfo).filter_by(private=False)
+    # Apply mapping if a friendly sort option is used
+    sql_sort = sort_mapping.get(sort, sort)
+    
+    logging.info(f"get_public_videos called with sort={sort} (SQL sort: {sql_sort})")
+    
+    # First, debug all videos to check if they exist in the database
+    all_videos_stmt = select(Video)
+    all_videos = db.session.execute(all_videos_stmt).scalars().all()
+    logging.info(f"DEBUG: Total videos in database (public): {len(all_videos)}")
+    for v in all_videos:
+        logging.info(f"DEBUG: Video ID: {v.video_id}, Owner ID: {v.owner_id}, Available: {v.available}, Game: {v.game.name if v.game else 'None'}")
+    
+    # All videos are now public - no filter needed
+    if sort and "views" in sort:
+        stmt = select(Video).join(VideoInfo)
         videos = db.session.execute(stmt).scalars().all()
     else:
-        stmt = select(Video).join(VideoInfo).filter_by(private=False).order_by(text(sort))
+        stmt = select(Video).join(VideoInfo).order_by(text(sql_sort))
         videos = db.session.execute(stmt).scalars().all()
+    
+    logging.info(f"Found {len(videos)} public videos in database")
     
     videos_json = []
     for v in videos:
         vjson = v.json()
         if (not vjson["available"]):
+            logging.info(f"Skipping unavailable video: {v.video_id}")
             continue
         vjson["view_count"] = VideoView.count(v.video_id)
         videos_json.append(vjson)
@@ -118,6 +170,8 @@ def get_public_videos():
     if sort == 'views desc':
         videos_json = sorted(videos_json, key=lambda d: d['view_count'], reverse=True)
 
+    logging.info(f"get_public_videos returning {len(videos_json)} videos")
+    
     return jsonify({"videos": videos_json})
 
 @videos_bp.route('/random', methods=['GET'])
@@ -137,11 +191,11 @@ def get_random_video():
 @videos_bp.route('/public/random', methods=['GET'])
 def get_random_public_video():
     
-    
-    stmt = select(func.count()).select_from(Video).filter(Video.info.has(private=False)).filter_by(available=True)
+    # All videos are now public - no filter for private needed
+    stmt = select(func.count()).select_from(Video).filter_by(available=True)
     row_count = db.session.execute(stmt).scalar_one()
     
-    stmt = select(Video).filter(Video.info.has(private=False)).filter_by(available=True).offset(int(row_count * random.random()))
+    stmt = select(Video).filter_by(available=True).offset(int(row_count * random.random()))
     random_video = db.session.execute(stmt).scalar_one_or_none()
     
     current_app.logger.info(f"Fetched public random video {random_video.video_id}: {random_video.info.title}")
@@ -188,7 +242,12 @@ def register_direct_routes(app_or_blueprint):
             video_info = db.session.execute(stmt).scalar_one_or_none()
             
             if video_info:
-                stmt = update(VideoInfo).filter_by(video_id=id).values(**request.json)
+                # Get request data and remove any private field if present - it's ignored
+                update_data = request.json.copy()
+                if 'private' in update_data:
+                    del update_data['private']  # Remove privacy field from the update
+                    
+                stmt = update(VideoInfo).filter_by(video_id=id).values(**update_data)
                 db.session.execute(stmt)
                 db.session.commit()
                 return Response(status=201)
@@ -253,7 +312,31 @@ def register_direct_routes(app_or_blueprint):
             if jpg_poster_path.exists():
                 return send_file(jpg_poster_path, mimetype='image/jpg')
             else:
-                # Return a default loading image or empty response
+                # Return 202 status to indicate processing in progress
+                logging.info(f"Static poster for {video_id} not found, still processing")
+                return Response(status=202)  # 202 Accepted - processing in progress
+    
+    # Add direct path parameter route for poster (modern style)
+    @app_or_blueprint.route('/api/video/poster/<video_id>', methods=['GET'])
+    def get_video_poster_by_id(video_id):
+        webm_poster_path = Path(current_app.config["PROCESSED_DIRECTORY"], "derived", video_id, "boomerang-preview.webm")
+        jpg_poster_path = Path(current_app.config["PROCESSED_DIRECTORY"], "derived", video_id, "poster.jpg")
+        
+        # Check if this is a request for an animated poster
+        if request.args.get('animated'):
+            # Check if the animated poster exists
+            if webm_poster_path.exists():
+                return send_file(webm_poster_path, mimetype='video/webm')
+            else:
+                # Return a default loading file or empty response
+                logging.info(f"Animated poster for {video_id} not found, still processing")
+                return Response(status=202)  # 202 Accepted - processing in progress
+        else:
+            # Check if the static poster exists
+            if jpg_poster_path.exists():
+                return send_file(jpg_poster_path, mimetype='image/jpg')
+            else:
+                # Return 202 status to indicate processing in progress
                 logging.info(f"Static poster for {video_id} not found, still processing")
                 return Response(status=202)  # 202 Accepted - processing in progress
     

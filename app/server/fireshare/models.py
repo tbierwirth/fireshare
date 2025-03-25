@@ -389,7 +389,8 @@ class Video(db.Model):
             "game": self.game.name if self.game else None,
             "game_id": self.game_id,
             "owner": self.owner.username if self.owner else None,
-            "tags": [tag.name for tag in self.tags]
+            "tags": [tag.name for tag in self.tags],
+            "private": False  # Always set to False - privacy concept removed
         }
         return j
 
@@ -407,7 +408,7 @@ class VideoInfo(db.Model):
     duration    = db.Column(db.Float)
     width       = db.Column(db.Integer)
     height      = db.Column(db.Integer)
-    private     = db.Column(db.Boolean, default=True)
+    private     = db.Column(db.Boolean, default=False)  # Changed default to False - all videos public by default
 
     video       = db.relationship("Video", back_populates="info", uselist=False, lazy="joined")
 

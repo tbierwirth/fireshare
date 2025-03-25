@@ -49,7 +49,15 @@ export default function useLoadingState({minDuration: minDuration = 800, initial
     }
   };
   useEffect((() => {
-    if (initialState) {
+    // Check if we should suppress initial loading state based on session storage
+    const hadFeedContent = sessionStorage.getItem('route:feed:hasVideos') === 'true';
+    const hadDashboardContent = sessionStorage.getItem('route:dashboard:hasVideos') === 'true';
+    const shouldSuppressLoading = hadFeedContent || hadDashboardContent;
+    
+    // If navigating between routes (Feed/Dashboard), use much shorter timeout
+    const navigationTimeout = shouldSuppressLoading ? 50 : minDuration;
+    
+    if (initialState && !shouldSuppressLoading) {
       loadStartTime.current = Date.now();
       isInTransition.current = true;
       timeoutRef.current = setTimeout((() => {
@@ -59,7 +67,13 @@ export default function useLoadingState({minDuration: minDuration = 800, initial
           isInTransition.current = false;
           if (onLoadingComplete) onLoadingComplete();
         }
-      }), minDuration);
+      }), navigationTimeout);
+    } else if (initialState && shouldSuppressLoading) {
+      // Skip loading state entirely if we previously had content
+      setIsLoadingState(false);
+      setIsFirstLoad(false);
+      isInTransition.current = false;
+      if (onLoadingComplete) onLoadingComplete();
     }
     return () => {
       isMounted.current = false;

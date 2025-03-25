@@ -208,7 +208,7 @@ def upload_video():
     info = VideoInfo(
         video_id=video_id, 
         title=Path(relative_path).stem, 
-        private=True  # Default to private
+        private=False  # All videos are public
     )
     db.session.add(info)
     

@@ -50,5 +50,12 @@ ENV ADMIN_PASSWORD admin
 # Enable setup mode by default for first-time installations
 ENV SETUP_MODE true
 
-EXPOSE 80
+# HTTPS configuration (disabled by default)
+ENV ENABLE_HTTPS false
+# Default to empty - need to be supplied when running container for HTTPS
+ENV SSL_CERT_PATH ""
+ENV SSL_KEY_PATH ""
+
+# Expose both HTTP and HTTPS ports
+EXPOSE 80 443
 CMD ["bash", "/entrypoint.sh"]

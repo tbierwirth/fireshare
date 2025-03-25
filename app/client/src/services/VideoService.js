@@ -74,11 +74,7 @@ const service = {
       title: title
     });
   },
-  updatePrivacy(id, value) {
-    return Api().put(`/api/video/details/${id}`, {
-      private: value
-    });
-  },
+  // updatePrivacy removed - all videos are now public
   updateDetails(id, details) {
     return Api().put(`/api/video/details/${id}`, {
       ...details

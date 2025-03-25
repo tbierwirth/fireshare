@@ -6,7 +6,7 @@ import SnackbarAlert from '../alert/SnackbarAlert'
 import logo from '../../assets/logo.png'
 import { useAuth } from '../../contexts/AuthContext'
 
-const LoginForm = function ({ sx }) {
+const LoginForm = function ({ sx = {} }) {
   const [username, setUsername] = useState(null)
   const [password, setPassword] = useState(null)
   const [alert, setAlert] = useState({ open: false })

@@ -1,12 +1,11 @@
 import axios from "axios";
 
-import { getUrl, cache } from "../common/utils";
+import { cache } from "../common/utils";
 
-const URL = getUrl();
-
+// For local development, use relative URLs to leverage the proxy setting in package.json
+// This will automatically use the proxy for /api/* requests
 const createDedupedRequest = () => {
   const instance = axios.create({
-    baseURL: URL,
     timeout: 1e4,
     withCredentials: true
   });

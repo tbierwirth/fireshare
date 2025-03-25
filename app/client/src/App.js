@@ -1,5 +1,5 @@
 import React from 'react'
-import { Route, HashRouter as Router, Routes, Navigate } from 'react-router-dom'
+import { Route, BrowserRouter as Router, Routes, Navigate } from 'react-router-dom'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
 import { CssBaseline } from '@mui/material'
 
@@ -23,39 +23,39 @@ import Navbar20 from './components/nav/Navbar20'
 import { AuthProvider, ConfigProvider } from './contexts'
 import { SetupWizardProvider } from './contexts/SetupWizardContext'
 import SetupWizard from './components/setup/SetupWizard'
-import SetupDebug from './components/setup/SetupDebug'
+// Debug component removed
 import ErrorBoundary from './components/utils/ErrorBoundary'
 
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000, 
-      cacheTime: 10 * 60 * 1000, 
-      retry: 1, 
+      staleTime: 10 * 60 * 1000, // Increase stale time to 10 minutes
+      cacheTime: 20 * 60 * 1000, // Increase cache time to 20 minutes
+      retry: 1,
       refetchOnWindowFocus: false,
       refetchOnReconnect: true,
+      refetchOnMount: 'if-stale', // Only refetch if data is stale
       
       placeholderData: (previousData) => previousData || undefined,
       
       onError: (error) => {
         const status = error?.response?.status;
         if (status === 401) {
-          
+          // Authentication error handling
         } else if (status >= 500) {
-          
+          // Server error handling
         }
       }
     },
     mutations: {
-      
-      retry: 0, 
+      retry: 0,
       onError: (error) => {
         const status = error?.response?.status;
         if (status === 401) {
-          
+          // Authentication error handling
         } else if (status >= 500) {
-          
+          // Server error handling
         }
       }
     }
@@ -78,8 +78,7 @@ export default function App() {
               <SetupWizardProvider>
                 {/* Setup Wizard component shows automatically when needed */}
                 <SetupWizard />
-                {/* Debug component for testing - remove before production */}
-                <SetupDebug />
+                {/* Debug components removed for production */}
                 
                 <Routes>
                   {}

@@ -131,15 +131,21 @@ def login():
 def setup_admin():
     """
     Create the initial admin account during first-time setup.
-    This endpoint is only available when the application has no users.
+    This endpoint is only available when the application has no users or when setup mode is explicitly enabled.
     """
     from sqlalchemy import select, func
+    import logging
+    
+    logger = logging.getLogger('fireshare')
+    
+    # Check if setup mode is enabled
+    setup_mode = current_app.config.get('SETUP_MODE', False)
     
     # Check if any users exist
     user_count = db.session.execute(select(func.count()).select_from(User)).scalar_one()
     
-    # Only allow creating the admin if no users exist
-    if user_count > 0:
+    # Allow creating the admin if setup mode is enabled or no users exist
+    if not setup_mode and user_count > 0:
         return Response(response="Setup already completed. Use regular registration.", status=403)
     
     username = request.json.get('username')
@@ -519,3 +525,37 @@ def delete_user(user_id):
 def logout():
     logout_user()
     return Response(status=200)
+    
+@auth.route('/api/setup/status-direct', methods=['GET'])
+def get_setup_status_direct():
+    """
+    A direct route in the auth blueprint for checking setup status.
+    This is a backup for the route registered in config.py.
+    """
+    from sqlalchemy import select, func
+    from .models import User
+    
+    # Check if we're in setup mode
+    setup_mode = current_app.config.get('SETUP_MODE', False)
+    
+    # Count users
+    user_count = db.session.execute(select(func.count()).select_from(User)).scalar_one()
+    
+    # Determine if we need setup based on user count or explicit flag
+    needs_setup = setup_mode or user_count == 0
+            
+    # Return setup status
+    response = {}
+    if needs_setup:
+        response = {
+            "needsSetup": True,
+            "setupSteps": [
+                "Create your admin account",
+                "Configure basic application settings",
+                "Start uploading videos"
+            ]
+        }
+    else:
+        response = {"needsSetup": False}
+        
+    return jsonify(response)

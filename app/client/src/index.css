@@ -83,6 +83,7 @@ video {
   min-width: 160px;
   min-height: 90px;
   box-sizing: border-box;
+  cursor: pointer; /* Make sure cursor indicates clickable */
 }
 
 /* No special classes needed for resizing */
@@ -98,6 +99,7 @@ video {
   background-color: var(--placeholder-color);
   display: block;
   cursor: pointer;
+  z-index: 2;
 }
 
 /* Slider active styles */
@@ -122,6 +124,8 @@ video {
   will-change: transform; /* Optimize for GPU acceleration */
   border-radius: 4px;
   background-color: #000; /* Black background for images while loading */
+  cursor: pointer; /* Ensure cursor shows as clickable */
+  z-index: 2; /* Make sure image is clickable */
 }
 
 /* Prevent any Material UI transitions from interfering */
@@ -167,7 +171,10 @@ video {
   max-width: var(--card-size) !important;
   transition: width 0.1s ease, height 0.1s ease;
   margin-bottom: 16px;
+  margin-right: 16px;
   display: block;
+  cursor: pointer;
+  z-index: 1;
 }
 
 /* Video card image styles */

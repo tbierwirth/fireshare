@@ -76,9 +76,9 @@ const UploadButton = ({ onSuccess }) => {
     if (statusIntervalRef.current) {
       clearInterval(statusIntervalRef.current)
     }
-
-    // Start a new interval
-    statusIntervalRef.current = setInterval(async () => {
+    
+    // Define the status check function
+    const checkStatus = async () => {
       try {
         const response = await VideoService.checkProcessingStatus(id)
         const { status, progress } = response.data
@@ -91,23 +91,23 @@ const UploadButton = ({ onSuccess }) => {
           clearInterval(statusIntervalRef.current)
           statusIntervalRef.current = null
           
-          // If completed, wait a bit before hiding the dialog
+          // If completed, hide the dialog immediately
           if (status === 'completed') {
-            setTimeout(() => {
-              setProcessingJobActive(false)
-              setShowDialog(false)
-              
-              // Notify success with quietRefresh flag for more seamless updates
-              if (onSuccess) {
-                onSuccess({
-                  message: 'Video processing completed! Your video is now available.',
-                  type: 'success',
-                  videoId: response.data.video_id,
-                  // Use quietRefresh to trigger a more targeted update
-                  quietRefresh: true
-                })
-              }
-            }, 1500) // Slightly longer wait to ensure processing is fully complete
+            // Close dialog and reset state immediately
+            setProcessingJobActive(false)
+            setShowDialog(false)
+            
+            // Notify success with processing completed
+            if (onSuccess) {
+              onSuccess({
+                message: 'Video upload successful!',
+                type: 'success',
+                videoId: response.data.video_id,
+                processingComplete: true,
+                // Use quietRefresh to trigger a more targeted update
+                quietRefresh: true
+              })
+            }
           } else {
             // If failed, show error message
             setProcessingJobActive(false)
@@ -122,7 +122,13 @@ const UploadButton = ({ onSuccess }) => {
       } catch (error) {
         console.error('Error checking processing status:', error)
       }
-    }, 2000) // Poll every 2 seconds
+    }
+    
+    // Check status immediately first
+    checkStatus()
+    
+    // Then start polling at a consistent interval with ProcessingVideoCard
+    statusIntervalRef.current = setInterval(checkStatus, 3000) // Poll every 3 seconds
   }
 
   const handleDialogClose = () => {
@@ -158,6 +164,7 @@ const UploadButton = ({ onSuccess }) => {
     const formData = new FormData()
     formData.append('file', selectedFile)
     formData.append('game', selectedGame)
+    // No need to set privacy as all videos are now public by default
     
     if (selectedTags && selectedTags.length > 0) {
       selectedTags.forEach(tag => {
@@ -180,13 +187,19 @@ const UploadButton = ({ onSuccess }) => {
       // Extract job_id from the response
       const { job_id } = response.data
       
-      // If we have a job ID, start polling for processing status
+      // If we have a job ID, close the dialog immediately and show processing card
       if (job_id) {
-        // Show initial success message for upload completion
-        // Also return video and job information for the placeholder card
+        // Close the dialog immediately after upload
+        setShowDialog(false)
+        setSelectedFile(null)
+        setSelectedGame('')
+        setSelectedTags([])
+        
+        // Show initial success message and create processing card
         if (onSuccess) {
+          // Show a minimalist success message and add the processing card
           onSuccess({
-            message: 'Upload successful! Your video is now being processed...',
+            message: 'Video uploaded and processing started',
             type: 'success',
             jobId: job_id,
             videoId: response.data.video_id,
@@ -195,7 +208,7 @@ const UploadButton = ({ onSuccess }) => {
           })
         }
         
-        // Start polling for processing status
+        // Start polling for processing status in the background
         startProcessingStatusPolling(job_id)
       } else {
         // If no job ID, just close dialog and show success
@@ -260,16 +273,14 @@ const UploadButton = ({ onSuccess }) => {
       {}
       <Dialog open={showDialog} onClose={handleDialogClose} maxWidth="sm" fullWidth>
         <DialogTitle>
-          {uploading 
+          {uploading
             ? `Uploading... ${Math.round(progress * 100)}%` 
-            : processingJobActive 
-              ? `Processing... ${processingProgress}%`
-              : 'Categorize Your Video'
+            : 'Categorize Your Video'
           }
         </DialogTitle>
         
         <DialogContent>
-          {uploading || processingJobActive ? (
+          {uploading ? (
             <>
               <Box sx={{ 
                 width: '100%', 
@@ -286,20 +297,15 @@ const UploadButton = ({ onSuccess }) => {
                     left: 0,
                     top: 0,
                     height: '100%',
-                    width: `${uploading ? progress * 100 : processingProgress}%`,
-                    bgcolor: uploading ? 'primary.main' : 'success.main',
+                    width: `${progress * 100}%`,
+                    bgcolor: 'primary.main',
                     transition: 'width 0.3s ease-in-out'
                   }}
                 />
               </Box>
-              
-              {processingJobActive && (
-                <Typography variant="body2" align="center" sx={{ mt: 1 }}>
-                  {processingStatus === 'processing' && 'Your video is being processed. This may take a few moments...'}
-                  {processingStatus === 'completed' && 'Processing complete! Your video is now available.'}
-                  {processingStatus === 'failed' && 'Processing failed. Please try again.'}
-                </Typography>
-              )}
+              <Typography variant="body2" align="center" sx={{ mt: 1 }}>
+                Uploading your video... This may take a moment depending on file size.
+              </Typography>
             </>
           ) : (
             <>
@@ -336,19 +342,17 @@ const UploadButton = ({ onSuccess }) => {
         </DialogContent>
         
         <DialogActions>
-          <Button onClick={handleDialogClose} disabled={uploading || processingJobActive}>
-            {processingJobActive ? 'Processing...' : 'Cancel'}
+          <Button onClick={handleDialogClose} disabled={uploading}>
+            Cancel
           </Button>
-          {!processingJobActive && (
-            <Button 
-              onClick={handleUpload} 
-              variant="contained" 
-              color="primary"
-              disabled={!selectedGame || uploading}
-            >
-              Upload
-            </Button>
-          )}
+          <Button 
+            onClick={handleUpload} 
+            variant="contained" 
+            color="primary"
+            disabled={!selectedGame || uploading}
+          >
+            Upload
+          </Button>
         </DialogActions>
       </Dialog>
     </>

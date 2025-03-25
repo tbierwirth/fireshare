@@ -4,10 +4,11 @@ import AuthService from "./AuthService";
 
 export function useAuthStatus(options = {}) {
   return useQuery({
-    queryKey: [ "auth", "status" ],
+    queryKey: ["auth", "status"],
     queryFn: () => AuthService.isLoggedIn(),
-    staleTime: 5 * 60 * 1e3,
-    refetchOnWindowFocus: true,
+    staleTime: 15 * 60 * 1000, // 15 minutes
+    refetchOnWindowFocus: false, // Prevent refetching on window focus
+    refetchOnMount: 'if-stale', // Only refetch if data is stale
     retry: 1,
     ...options
   });
@@ -24,19 +25,13 @@ export function useUserProfile(isAuthenticated = false, options = {}) {
 }
 
 export function useUsers(isAdmin = false, options = {}) {
-  console.log("useUsers hook - Admin status:", {
-    isAdmin: isAdmin
-  });
   return useQuery({
-    queryKey: [ "users" ],
+    queryKey: ["users"],
     queryFn: async () => {
-      console.log("Fetching users with admin status:", isAdmin);
       try {
         const result = await AuthService.getUsers();
-        console.log("Users fetch successful:", result.data?.users?.length || 0, "users");
         return result;
       } catch (error) {
-        console.error("Error fetching users:", error.response?.status, error.message);
         throw error;
       }
     },
@@ -48,19 +43,13 @@ export function useUsers(isAdmin = false, options = {}) {
 }
 
 export function useInvites(isAdmin = false, options = {}) {
-  console.log("useInvites hook - Admin status:", {
-    isAdmin: isAdmin
-  });
   return useQuery({
-    queryKey: [ "invites" ],
+    queryKey: ["invites"],
     queryFn: async () => {
-      console.log("Fetching invites with admin status:", isAdmin);
       try {
         const result = await AuthService.getInvites();
-        console.log("Invites fetch successful:", result.data?.invites?.length || 0, "invites");
         return result;
       } catch (error) {
-        console.error("Error fetching invites:", error.response?.status, error.message);
         throw error;
       }
     },
@@ -135,24 +124,16 @@ export function useCreateUser() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: userData => {
-      console.log("AuthQueryHooks - Creating user with data:", userData);
       return AuthService.createUser(userData);
     },
     onSuccess: data => {
-      console.log("AuthQueryHooks - User creation succeeded:", data);
       queryClient.invalidateQueries({
-        queryKey: [ "users" ]
+        queryKey: ["users"]
       });
     },
     onError: error => {
-      console.error("AuthQueryHooks - Error creating user:", error);
-      console.error("Error details:", {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        headers: error.response?.headers,
-        message: error.message
-      });
+      // Keep only critical error details
+      console.error("User creation failed:", error.message);
     }
   });
 }
@@ -185,27 +166,16 @@ export function useCreateInvite() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({email: email, expiresDays: expiresDays}) => {
-      console.log("AuthQueryHooks - Creating invite with data:", {
-        email: email,
-        expiresDays: expiresDays
-      });
       return AuthService.createInvite(email, expiresDays);
     },
     onSuccess: data => {
-      console.log("AuthQueryHooks - Invite creation succeeded:", data);
       queryClient.invalidateQueries({
-        queryKey: [ "invites" ]
+        queryKey: ["invites"]
       });
     },
     onError: error => {
-      console.error("AuthQueryHooks - Error creating invite:", error);
-      console.error("Error details:", {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        headers: error.response?.headers,
-        message: error.message
-      });
+      // Keep only critical error details
+      console.error("Invite creation failed:", error.message);
     }
   });
 }

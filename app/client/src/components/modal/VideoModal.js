@@ -47,7 +47,9 @@ const VideoModal = ({ open, onClose, videoId, feedView, authenticated, updateCal
   React.useEffect(() => {
     async function fetch() {
       try {
+        console.log('VideoModal - Fetching details for videoId:', videoId)
         const details = (await VideoService.getDetails(videoId)).data
+        console.log('VideoModal - Received details:', details)
         setViewAdded(false)
         setVideo(details)
         setTitle(details.info?.title)
@@ -55,13 +57,12 @@ const VideoModal = ({ open, onClose, videoId, feedView, authenticated, updateCal
         setPrivateView(details.info?.private)
         setUpdatable(false)
       } catch (err) {
-        setAlert(
-          setAlert({
-            type: 'error',
-            message: 'Unable to load video details',
-            open: true,
-          }),
-        )
+        console.error('VideoModal - Error fetching video details:', err)
+        setAlert({
+          type: 'error',
+          message: 'Unable to load video details',
+          open: true,
+        })
       }
     }
     if (videoId) {

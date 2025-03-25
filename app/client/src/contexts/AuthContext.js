@@ -108,23 +108,25 @@ export const AuthProvider = ({ children }) => {
   
   const login = async (username, password) => {
     try {
-      console.log(`Login attempt for ${username}`);
-      
-      
+      // Clear cached auth data
       localStorage.removeItem('auth_status');
-      cache.remove('user_profile');
       
+      // Check if cache.remove exists before calling it
+      if (typeof cache.remove === 'function') {
+        cache.remove('user_profile');
+      } else {
+        localStorage.removeItem('user_profile_data');
+      }
       
+      // Execute login
       const result = await loginMutation.mutateAsync({ username, password });
-      console.log('Login successful:', result);
       
-      
+      // Update state
       setSkipProfileFetch(false);
       await refetchAuth();
       
       return result;
     } catch (error) {
-      console.error('Login failed:', error);
       throw error;
     }
   };
@@ -134,36 +136,48 @@ export const AuthProvider = ({ children }) => {
     try {
       await logoutMutation.mutateAsync();
       
-      
+      // Clear cached auth data
       localStorage.removeItem('auth_status');
-      cache.remove('user_profile');
       
+      // Check if cache.remove exists before calling it
+      if (typeof cache.remove === 'function') {
+        cache.remove('user_profile');
+      } else {
+        localStorage.removeItem('user_profile_data');
+      }
       
+      // Refresh authentication state
       await refetchAuth();
-      
-      console.log('Logout completed successfully');
     } catch (error) {
-      console.error('Logout failed:', error);
-      
-      
+      // Clear all query cache on error
       queryClient.clear();
     }
   };
   
   
   const refreshAuthStatus = async () => {
-    console.log('Manually refreshing auth status');
-    
-    
-    localStorage.removeItem('auth_status');
-    cache.remove('user_profile');
-    
-    
-    setSkipProfileFetch(false);
-    await refetchAuth();
-    
-    if (isAuthenticated) {
-      await refetchProfile();
+    try {
+      // Clear cached auth data
+      localStorage.removeItem('auth_status');
+      
+      // Check if cache.remove exists before calling it
+      if (typeof cache.remove === 'function') {
+        cache.remove('user_profile');
+      } else {
+        localStorage.removeItem('user_profile_data');
+      }
+      
+      // Trigger refetch
+      setSkipProfileFetch(false);
+      await refetchAuth();
+      
+      if (isAuthenticated) {
+        await refetchProfile();
+      }
+    } catch (error) {
+      // Still set skipProfileFetch to false even if there's an error
+      setSkipProfileFetch(false);
+      throw error; // Rethrow the error so callers can handle it
     }
   };
   

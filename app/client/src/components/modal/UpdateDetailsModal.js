@@ -9,8 +9,17 @@ import { VideoService } from '../../services';
 import LightTooltip from '../misc/LightTooltip';
 import { TagInput } from '../tags';
 import GameSelector from '../tags/GameSelectorWithQuery';
-import { useQueryClient, useMutation, useQuery } from '@tanstack/react-query';
-import { useVideoGame, useVideoTags } from '../../services/VideoQueryHooks';
+import { useQueryClient, useMutation } from '@tanstack/react-query';
+import { 
+  useVideoGame, 
+  useVideoTags, 
+  useUpdateVideoDetails, 
+  useUpdateVideoGame, 
+  useUpdateVideoTags,
+  // Cache keys
+  PUBLIC_VIDEOS_KEY,
+  MY_VIDEOS_KEY
+} from '../../services/VideoQueryHooks';
 
 
 const style = {
@@ -82,21 +91,32 @@ const UpdateDetailsModal = ({ open, close, videoId, currentTitle, currentDescrip
     }
   }, [open]);
   
-  // Mutation for saving changes
+  // Get update mutations
+  const updateDetails = useUpdateVideoDetails();
+  const updateGame = useUpdateVideoGame();
+  const updateTags = useUpdateVideoTags();
+  
+  // Combined save mutation
   const saveMutation = useMutation({
     mutationFn: async () => {
       // Update details
-      await VideoService.updateDetails(videoId, {
-        title,
-        description
+      await updateDetails.mutateAsync({
+        videoId,
+        updateData: { title, description }
       });
       
       // Update game
-      await VideoService.setVideoGame(videoId, game);
+      await updateGame.mutateAsync({
+        videoId,
+        gameName: game
+      });
       
       // Update tags if needed
       if (tags.length > 0) {
-        await VideoService.addVideoTags(videoId, tags);
+        await updateTags.mutateAsync({
+          videoId,
+          tags
+        });
       }
     },
     onSuccess: () => {
@@ -107,13 +127,7 @@ const UpdateDetailsModal = ({ open, close, videoId, currentTitle, currentDescrip
         message: 'Video updated successfully!'
       });
       
-      
-      queryClient.invalidateQueries(['videoDetails', videoId]);
-      queryClient.invalidateQueries(['videoGame', videoId]);
-      queryClient.invalidateQueries(['videoTags', videoId]);
-      queryClient.invalidateQueries(['videos']);
-      queryClient.invalidateQueries(['publicVideos']);
-      
+      // Cache is automatically invalidated by the individual mutation hooks
       
       close({
         title,
@@ -142,9 +156,9 @@ const UpdateDetailsModal = ({ open, close, videoId, currentTitle, currentDescrip
         message: 'Video deleted successfully'
       });
       
-      
-      queryClient.invalidateQueries(['videos']);
-      queryClient.invalidateQueries(['publicVideos']);
+      // Invalidate queries after delete
+      queryClient.invalidateQueries({queryKey: PUBLIC_VIDEOS_KEY});
+      queryClient.invalidateQueries({queryKey: MY_VIDEOS_KEY});
       
       close('delete');
     },
@@ -225,7 +239,7 @@ const UpdateDetailsModal = ({ open, close, videoId, currentTitle, currentDescrip
               initialGame={game} 
               onChange={(newGame) => {
                 console.log('Game changed to:', newGame);
-                
+                // No need to set state locally as the component already manages this
               }}
               disabled={isLoading}
             />

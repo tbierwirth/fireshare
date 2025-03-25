@@ -2,7 +2,7 @@ import React from 'react';
 import { Box, Typography } from '@mui/material';
 import { useLoadingState, useOptimisticUI } from '../../hooks';
 import { VideoListSkeleton } from './SkeletonLoader';
-import VideoList from '../admin/VideoList';
+import VideoList from './VideoList';
 
 const OptimizedVideoList = ({ 
   videos = [],

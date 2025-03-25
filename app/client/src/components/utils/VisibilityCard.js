@@ -3,8 +3,6 @@ import { useIsVisible } from 'react-is-visible'
 import { Box, Typography, ButtonGroup, Button, IconButton } from '@mui/material'
 import EditIcon from '@mui/icons-material/Edit'
 import LinkIcon from '@mui/icons-material/Link'
-import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
-import VisibilityIcon from '@mui/icons-material/Visibility'
 import { CopyToClipboard } from 'react-copy-to-clipboard'
 import { getPublicWatchUrl, getUrl, toHHMMSS } from '../../common/utils'
 import { VideoService } from '../../services'
@@ -28,11 +26,11 @@ const VisibilityCard = ({
   
   const [detailsModalOpen, setDetailsModalOpen] = useState(false)
   const nodeRef = useRef()
-  useIsVisible(nodeRef) 
-  const [privateView, setPrivateView] = useState(video.info?.private)
+  useIsVisible(nodeRef)
   
   const handleViewClick = (e) => {
-    e.stopPropagation()
+    // Don't stop propagation
+    console.log('Video clicked:', video.video_id)
     openVideo(video.video_id)
   }
 
@@ -46,33 +44,7 @@ const VisibilityCard = ({
     })
   }
   
-  
-  const handleToggleVisibility = async (e) => {
-    e.stopPropagation()
-    try {
-      await VideoService.updatePrivacy(video.video_id, !privateView)
-      setPrivateView(!privateView)
-      
-      
-      handleAlert({
-        type: privateView ? 'info' : 'warning',
-        message: privateView ? `Added to your public feed` : `Removed from your public feed`,
-        open: true,
-      })
-      
-      
-      if (typeof video.handleUpdate === 'function') {
-        video.handleUpdate({ id: video.video_id, private: !privateView })
-      }
-    } catch (err) {
-      console.error('Error toggling visibility:', err)
-      handleAlert({
-        type: 'error',
-        message: 'Failed to update visibility',
-        open: true,
-      })
-    }
-  }
+  // Removed visibility toggle as all videos are now public
   
   
   const handleDetailsModalClose = (update) => {
@@ -104,7 +76,10 @@ const VisibilityCard = ({
       <Box 
         ref={nodeRef}
         className="card-inner"
-        onClick={handleViewClick}
+        onClick={(e) => {
+          console.log('Box clicked for video_id:', video.video_id);
+          handleViewClick(e);
+        }}
         sx={{ 
           position: 'relative',
           overflow: 'hidden',
@@ -117,7 +92,8 @@ const VisibilityCard = ({
           '&:hover': {
             transform: 'translateY(-4px)',
             boxShadow: '0 6px 12px rgba(0,0,0,0.3)',
-          }
+          },
+          zIndex: 10 // Ensure clickable area is on top
         }}
       >
       {}
@@ -177,26 +153,7 @@ const VisibilityCard = ({
         >
           {video.info?.title || "No Title"}
         </Typography>
-        {}
-        {(isAdmin || (authenticated && !feedView)) && (
-          <Button
-            edge="end"
-            onClick={handleToggleVisibility}
-            sx={{
-              borderBottomRightRadius: 0,
-              borderTopRightRadius: '6px',
-              bgcolor: 'rgba(0,0,0,0)',
-              color: privateView ? '#FF2323B2' : '#2382FFB7',
-              border: 'none',
-              borderLeft: 'none',
-              ':hover': {
-                bgcolor: privateView ? '#FF232340' : '#2382FF40',
-              },
-            }}
-          >
-            {privateView ? <VisibilityOffIcon /> : <VisibilityIcon />}
-          </Button>
-        )}
+        {/* All videos are now public, no visibility toggle needed */}
       </ButtonGroup>
 
       {}
@@ -231,13 +188,18 @@ const VisibilityCard = ({
           src={`${URL}/api/video/poster?id=${video.video_id}`}
           alt={video.info?.title || "Video thumbnail"}
           className="video-card-image"
+          onClick={(e) => {
+            console.log('Image clicked for video_id:', video.video_id);
+            handleViewClick(e);
+          }}
           style={{
             position: 'absolute',
             top: 0, left: 0,
             width: '100%',
             height: '100%',
             objectFit: 'cover',
-            zIndex: 2
+            zIndex: 2,
+            cursor: 'pointer'
           }}
           loading="eager"
         />

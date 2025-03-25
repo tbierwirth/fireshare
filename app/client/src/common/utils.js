@@ -8,21 +8,46 @@ export const getServedBy = () => {
 }
 
 export const getUrl = () => {
-  const portWithColon = window.location.port ? `:${window.location.port}` : ''
-  return isLocalhost
-    ? `http://${window.location.hostname}:${process.env.REACT_APP_SERVER_PORT || window.location.port}`
-    : `${window.location.protocol}//${window.location.hostname}${portWithColon}`
+  const portWithColon = window.location.port ? `:${window.location.port}` : '';
+  
+  // Check if SSL is specifically configured
+  const forceSSL = localStorage.getItem('force_ssl') === 'true';
+  
+  if (isLocalhost) {
+    // In development, always use http:// with port 5000
+    return `http://${window.location.hostname}:5000`;
+  } else if (forceSSL) {
+    // With force_ssl, always use https://
+    return `https://${window.location.hostname}${portWithColon}`;
+  } else {
+    // Otherwise, preserve the protocol currently being used
+    return `${window.location.protocol}//${window.location.hostname}${portWithColon}`;
+  }
 }
 
 export const getPublicWatchUrl = () => {
-  const shareableLinkDomain = getSetting('ui_config')?.['shareable_link_domain']
+  // First check for customized shareable link domain in settings
+  const shareableLinkDomain = getSetting('ui_config')?.['shareable_link_domain'];
   if (shareableLinkDomain) {
-    return `${shareableLinkDomain}/w/`
+    // Ensure the domain includes protocol - and default to https if not specified
+    if (shareableLinkDomain.includes('://')) {
+      return `${shareableLinkDomain}/w/`;
+    } else {
+      return `https://${shareableLinkDomain}/w/`;
+    }
   }
-  const portWithColon = window.location.port ? `:${window.location.port}` : ''
-  return isLocalhost
-    ? `http://${window.location.hostname}:${process.env.REACT_APP_SERVER_PORT || window.location.port}/#/w/`
-    : `${window.location.protocol}//${window.location.hostname}${portWithColon}/w/`
+  
+  // When no custom domain is set, use the current host
+  const portWithColon = window.location.port ? `:${window.location.port}` : '';
+  const forceSSL = localStorage.getItem('force_ssl') === 'true';
+  
+  if (isLocalhost) {
+    return `http://${window.location.hostname}:5000/w/`;
+  } else if (forceSSL) {
+    return `https://${window.location.hostname}${portWithColon}/w/`;
+  } else {
+    return `${window.location.protocol}//${window.location.hostname}${portWithColon}/w/`;
+  }
 }
 
 export const getVideoPath = (id, extension) => {
@@ -46,85 +71,25 @@ export const useDebounce = (value, delay) => {
 }
 
 
-export function withTiming(Component) {
-  const WrappedComponent = React.forwardRef((props, ref) => {
-    const componentName = Component.displayName || Component.name || 'Component';
-    const renderCount = React.useRef(0);
-    
-    
-    renderCount.current += 1;
-    
-    console.log(`[${new Date().toISOString()}] ${componentName} rendering (count: ${renderCount.current})`);
-    console.time(`${componentName} render #${renderCount.current}`);
-    
-    
-    const enhancedProps = {
-      ...props,
-      _debugRenderCount: renderCount.current
-    };
-    
-    
-    React.useEffect(() => {
-      console.log(`[${new Date().toISOString()}] ${componentName} state:`, enhancedProps);
-      
-      return () => {
-        console.log(`[${new Date().toISOString()}] ${componentName} unmounting`);
-      };
-    }, []);
-    
-    
-    const result = <Component {...enhancedProps} ref={ref} />;
-    console.timeEnd(`${componentName} render #${renderCount.current}`);
-    
-    return result;
-  });
-  
-  
-  WrappedComponent.displayName = `withTiming(${Component.displayName || Component.name || 'Component'})`;
-  
-  return WrappedComponent;
-}
-
-
-export function useTrackedState(initialState, debugName) {
-  const [state, setState] = React.useState(initialState);
-  const stateRef = React.useRef(initialState);
-  const updateCount = React.useRef(0);
-  const componentName = debugName || 'Component';
-  
-  
-  const setTrackedState = React.useCallback((newState) => {
-    updateCount.current += 1;
-    const count = updateCount.current;
-    
-    
-    const resolvedNewState = typeof newState === 'function' 
-      ? newState(stateRef.current) 
-      : newState;
-    
-    console.log(`[${new Date().toISOString()}] ${componentName} state update #${count}:`, {
-      from: stateRef.current,
-      to: resolvedNewState,
-      diff: typeof resolvedNewState === 'object' && typeof stateRef.current === 'object'
-        ? Object.keys(resolvedNewState).reduce((acc, key) => {
-            if (resolvedNewState[key] !== stateRef.current[key]) {
-              acc[key] = {
-                from: stateRef.current[key],
-                to: resolvedNewState[key]
-              };
-            }
-            return acc;
-          }, {})
-        : 'Simple value change'
-    });
-    
-    
-    stateRef.current = resolvedNewState;
-    setState(resolvedNewState);
-  }, [componentName]);
-  
-  return [state, setTrackedState];
-}
+// Simple logger utility that can be enabled/disabled via localStorage
+export const logger = {
+  debug: (component, ...args) => {
+    if (process.env.NODE_ENV === 'development' && localStorage.getItem('enable_debug_logs') === 'true') {
+      console.debug(`[${component}]`, ...args);
+    }
+  },
+  info: (component, ...args) => {
+    if (process.env.NODE_ENV === 'development') {
+      console.info(`[${component}]`, ...args);
+    }
+  },
+  warn: (component, ...args) => {
+    console.warn(`[${component}]`, ...args);
+  },
+  error: (component, ...args) => {
+    console.error(`[${component}]`, ...args);
+  }
+};
 
 
 const pendingRequests = {};
@@ -159,11 +124,17 @@ export const cache = {
     }
   },
   
+  remove: (key) => {
+    try {
+      localStorage.removeItem(key);
+    } catch (err) {
+      console.error(`Cache removal error for key ${key}:`, err);
+    }
+  },
   
   isRequestPending: (key) => {
     return !!pendingRequests[key];
   },
-  
   
   registerRequest: (key, promise) => {
     pendingRequests[key] = promise;
@@ -173,7 +144,6 @@ export const cache = {
     });
     return promise;
   },
-  
   
   getPendingRequest: (key) => {
     return pendingRequests[key];

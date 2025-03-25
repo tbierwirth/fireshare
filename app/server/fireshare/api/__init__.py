@@ -17,6 +17,7 @@ from .tags import register_routes as register_tags_routes
 from .folders import register_routes as register_folders_routes
 from .config import register_routes as register_config_routes
 from .uploads import register_routes as register_uploads_routes
+from .setup import register_blueprint as register_setup_blueprint
 
 
 register_games_routes(api)
@@ -25,6 +26,7 @@ register_tags_routes(api)
 register_folders_routes(api)
 register_config_routes(api)
 register_uploads_routes(api)
+register_setup_blueprint(api)
 
 
 from .utils.path_helpers import get_video_path

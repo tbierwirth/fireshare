@@ -1,7 +1,7 @@
 import os, sys
 import os.path
 import ldap
-from flask import Flask
+from flask import Flask, request
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_login import LoginManager
@@ -57,7 +57,27 @@ def update_config(path):
 
 def create_app(init_schedule=False):
     app = Flask(__name__, static_url_path='', static_folder='build', template_folder='build')
+    
+    # Enhanced CORS configuration with better security
     CORS(app, supports_credentials=True)
+    
+    # Configure security headers for HTTPS
+    @app.after_request
+    def add_security_headers(response):
+        # Strict Transport Security: force HTTPS
+        if os.environ.get('ENABLE_HTTPS', 'false').lower() == 'true':
+            response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+        
+        # Content Security Policy
+        response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' blob:; font-src 'self'; connect-src 'self'"
+        
+        # Add CORS headers to error responses too
+        response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        
+        return response
     if 'DATA_DIRECTORY' not in os.environ:
         raise Exception("DATA_DIRECTORY not found in environment")
 

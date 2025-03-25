@@ -1,6 +1,45 @@
 #!/bin/bash
 set -e  # Exit on error
 
+# Configure HTTPS if enabled
+if [ "$ENABLE_HTTPS" = "true" ]; then
+    echo "HTTPS is enabled, configuring SSL..."
+    
+    # Check if SSL certificate and key are provided
+    if [ -z "$SSL_CERT_PATH" ] || [ -z "$SSL_KEY_PATH" ]; then
+        echo "ERROR: HTTPS is enabled but SSL_CERT_PATH or SSL_KEY_PATH is not set"
+        echo "Please provide both SSL_CERT_PATH and SSL_KEY_PATH when enabling HTTPS"
+        exit 1
+    fi
+    
+    # Check if certificate files exist
+    if [ ! -f "$SSL_CERT_PATH" ] || [ ! -f "$SSL_KEY_PATH" ]; then
+        echo "ERROR: SSL certificate or key file does not exist"
+        echo "Certificate path: $SSL_CERT_PATH"
+        echo "Key path: $SSL_KEY_PATH"
+        exit 1
+    fi
+    
+    # Create SSL directories if they don't exist
+    mkdir -p /etc/ssl/certs
+    mkdir -p /etc/ssl/private
+    
+    # Copy SSL certificate and key
+    cp "$SSL_CERT_PATH" /etc/ssl/certs/fireshare.crt
+    cp "$SSL_KEY_PATH" /etc/ssl/private/fireshare.key
+    
+    # Set proper permissions
+    chmod 644 /etc/ssl/certs/fireshare.crt
+    chmod 600 /etc/ssl/private/fireshare.key
+    
+    # Use the HTTPS nginx configuration
+    cp /app/nginx/prod.conf.https /etc/nginx/nginx.conf
+    echo "HTTPS configuration complete"
+else
+    echo "Using standard HTTP configuration"
+fi
+
+# Start nginx
 nginx -g 'daemon on;'
 
 PUID=${PUID:-1000}

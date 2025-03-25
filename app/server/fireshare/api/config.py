@@ -24,6 +24,10 @@ def get_config():
 
 
 def register_direct_routes(app_or_blueprint):
+    """
+    Register routes directly on the app or blueprint.
+    These routes don't use the config_bp blueprint.
+    """
     
     @app_or_blueprint.route('/api/user/settings', methods=["GET", "PUT"])
     @login_required
@@ -104,47 +108,7 @@ def register_direct_routes(app_or_blueprint):
         else:
             return jsonify(warnings)
     
-    @app_or_blueprint.route('/api/setup/status', methods=["GET"])
-    def get_setup_status():
-        """
-        Returns the setup status of the application.
-        This endpoint is public and does not require authentication.
-        It helps the UI determine if this is a fresh installation that needs setup.
-        """
-        from sqlalchemy import select, func
-        from ..models import User
-        import logging
-        
-        logger = logging.getLogger('fireshare')
-        
-        # Check if we're in setup mode
-        setup_mode = current_app.config.get('SETUP_MODE', False)
-        logger.info(f"Setup status check: SETUP_MODE = {setup_mode}")
-        
-        # Count users
-        user_count = db.session.execute(select(func.count()).select_from(User)).scalar_one()
-        logger.info(f"Setup status check: User count = {user_count}")
-        
-        # Determine if we need setup based on user count or explicit flag
-        needs_setup = setup_mode or user_count == 0
-        logger.info(f"Setup status check: needs_setup = {needs_setup}")
-                
-        # Return setup status
-        response = {}
-        if needs_setup:
-            response = {
-                "needsSetup": True,
-                "setupSteps": [
-                    "Create your admin account",
-                    "Configure basic application settings",
-                    "Start uploading videos"
-                ]
-            }
-        else:
-            response = {"needsSetup": False}
-            
-        logger.info(f"Setup status response: {response}")
-        return jsonify(response)
+    # Setup endpoints moved to dedicated setup.py module
     
     @app_or_blueprint.route('/api/manual/scan')
     @login_required
