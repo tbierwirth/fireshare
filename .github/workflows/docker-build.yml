@@ -1,56 +1,118 @@
-name: Build and Push Docker Image
+name: Docker Build and Publish
 
 on:
   push:
-    branches: [ main ]
-    tags: [ 'v*' ]
+    branches: 
+      - main
+      - develop
+    paths:
+      - "app/**"
+      - "migrations/**"
+      - "Dockerfile"
+      - "entrypoint.sh"
+      - ".github/workflows/docker-build-publish.yml"
+    tags:
+      - "v*"
   pull_request:
-    branches: [ main ]
-  workflow_dispatch:  # For manual triggers
+    branches: 
+      - main
+      - develop
+  workflow_dispatch:
+    inputs:
+      custom_tag:
+        description: "Custom tag to apply (optional)"
+        required: false
+        type: string
 
 env:
-  IMAGE_NAME: yourusername/fireshare  # Replace with your Docker Hub username
+  REGISTRY: docker.io
+  IMAGE_NAME: tbierwirth/fireshare
 
 jobs:
-  build:
+  build-and-publish:
+    name: Build and Publish Docker Image
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-
+    
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
 
       - name: Log in to Docker Hub
+        # Only login for events that will publish (not PRs)
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Extract metadata (tags, labels) for Docker
+      - name: Extract metadata
         id: meta
-        uses: docker/metadata-action@v4
+        uses: docker/metadata-action@v5
         with:
-          images: ${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
+            # For version tags (e.g., v1.0.0)
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=ref,event=branch
+            # Set 'latest' on main branch pushes
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            # Set 'develop' on develop branch pushes
+            type=raw,value=develop,enable=${{ github.ref == 'refs/heads/develop' }}
+            # For pull requests, use PR number
             type=ref,event=pr
-            type=sha
-            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+            # For custom tags from manual workflow
+            type=raw,value=${{ inputs.custom_tag }},enable=${{ inputs.custom_tag != '' }}
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v4
+      # Add a summary of what we're doing
+      - name: Build Summary
+        run: |
+          echo "## Docker Build Details" >> $GITHUB_STEP_SUMMARY
+          echo "Building image: ${{ env.IMAGE_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "Event type: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "Branch/tag: ${{ github.ref }}" >> $GITHUB_STEP_SUMMARY
+          echo "Will push: ${{ github.event_name != 'pull_request' }}" >> $GITHUB_STEP_SUMMARY
+          echo "Tags: ${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+          
+          # Make this visible in logs too
+          echo "::notice::Building image ${{ env.IMAGE_NAME }} for ${{ github.ref }}"
+          echo "::notice::Will push: ${{ github.event_name != 'pull_request' }}"
+          echo "::notice::Tags: ${{ steps.meta.outputs.tags }}"
+
+      - name: Build and push image
+        id: build-push
+        uses: docker/build-push-action@v5
         with:
           context: .
+          platforms: linux/amd64,linux/arm64
+          # Only push for non-PR events
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # Add build arguments if needed
+          # build-args: |
+          #   ARG_NAME=value
+
+      # Add a summary of what we did
+      - name: Publish Summary
+        if: github.event_name != 'pull_request' && steps.build-push.outcome == 'success'
+        run: |
+          echo "## Docker Publish Results" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Successfully published image to Docker Hub" >> $GITHUB_STEP_SUMMARY
+          echo "Published tags:" >> $GITHUB_STEP_SUMMARY
+          for tag in $(echo "${{ steps.meta.outputs.tags }}" | tr '\n' ' '); do
+            echo "- $tag" >> $GITHUB_STEP_SUMMARY
+          done
+          
+          # Make this visible in logs too
+          echo "::notice::Successfully published image to Docker Hub"
